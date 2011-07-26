@@ -1,0 +1,359 @@
+<?xml version="1.0"?>
+<!DOCTYPE overlay>
+<!--
+// ==UserScript==
+// @name           SnapLinks.uc.xul
+// @namespace      http://d.hatena.ne.jp/Griever/
+// @description    Snap Links for userChromeJS
+// @include        main
+// @version        7/3
+// @note           フルズームでうまく動かない問題を修正
+// ==/UserScript==
+ -->
+<!--
+
+FireGestures や keyconfig で snapLinks(); を実行
+
+
+引数に eventを送るとすぐに四角を描くようになる（MouseEvent限定）
+snapLinks(event);
+
+
+
+-->
+<?xml-stylesheet href="data:text/css,@namespace%20url('http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul');
+
+#snapLinksBoxPopup {
+  -moz-appearance: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 1px red dotted !important;
+  background-color: rgba(32, 32, 255, .1) !important;
+  max-width: none !important;
+  cursor: crosshair !important;
+}
+
+#snapLinksMenupopup.hasLink .hasLink,
+#snapLinksMenupopup.hasCheckbox .hasCheckbox
+  { visibility: visible !important; }
+
+#snapLinksMenupopup:not(.hasLink) .hasLink,
+#snapLinksMenupopup:not(.hasCheckbox) .hasCheckbox 
+  { visibility: collapse !important; }
+
+" type="text/css"?>
+
+<overlay id="SnapLinks_overlay"  xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+	<popupset id="mainPopupSet">
+		<menupopup id="snapLinksMenupopup">
+			<menuitem label="リンクを新しいタブで開く" class="hasLink" oncommand="snap.openLinks();"/>
+			<menuitem label="画像リンクを新しいタブで開く" class="hasLink" oncommand="snap.openLinks(/\.(jpe?g|png|gif|bmp)$/i);"/>
+			<menuitem label="画像リンクをひとつのタブで開く" class="hasLink" oncommand="snap.imageOnePage();"/>
+			<menuitem label="リンクの URL をコピー" class="hasLink" oncommand="snap.copyLinks();"/>
+			<menuitem label="リンクされたファイルの URL をコピー" class="hasLink" oncommand="snap.copyLinks(/\.(jpe?g|png|gif|bmp|wmv|mpe?g|flv|avi|asf|mp3|mp4|m4a|wma|wav)$/i);"/>
+			<menuseparator class="hasLink hasCheckbox"/>
+			<menuitem label="チェックボックスを ON にする" class="hasCheckbox" oncommand="snap.checkbox(true);"/>
+			<menuitem label="チェックボックスを OFF にする" class="hasCheckbox" oncommand="snap.checkbox(false);"/>
+			<menuitem label="チェックボックスをトグル" class="hasCheckbox" oncommand="snap.toggleCheckbox();"/>
+		</menupopup>
+		<tooltip id="snapLinksBoxPopup"/>
+	</popupset>
+  <script type="application/x-javascript" xmlns="http://www.w3.org/1999/xhtml"><![CDATA[
+
+window.snap = null;
+snapLinks = function snapLinks(event){
+	if (window.snap) {
+		window.snap.destroy();
+	}
+	window.snap = new snapLinks_ucjs(event);
+}
+snapLinks_ucjs = function snapLinks_ucjs(event){
+	this.init(event);
+}
+snapLinks_ucjs.prototype = {
+	HIGHLIGHT_COLOR: 'green',
+	HIGHLIGHT_SELECTOR: 'a[href], input[type="checkbox"]',
+
+	init: function(event) {
+		this.popup = document.getElementById('snapLinksMenupopup');
+		this.box = document.getElementById('snapLinksBoxPopup');
+		this.browser = gBrowser.mCurrentBrowser;
+
+		this.getWindowList();
+		this.setCursor();
+		if (event instanceof MouseEvent)
+			this.drawBox(event);
+		else 
+			this.browser.addEventListener('mousedown', this, true);
+
+	},
+
+	addListener : function(){
+		this.browser.addEventListener('mousemove', this, true);
+		this.browser.addEventListener('mouseup', this, true);
+		this.browser.addEventListener('TabSelect', this, false);
+		this.browser.addEventListener('unload', this, true);
+	},
+
+	removeListener : function(){
+		this.browser.removeEventListener('mousedown', this, true);
+		this.browser.removeEventListener('mousemove', this, true);
+		this.browser.removeEventListener('mouseup', this, true);
+		this.browser.removeEventListener('TabSelect', this, false);
+		this.browser.removeEventListener('unload', this, true);
+	},
+
+	destroy: function() {
+		this.removeListener();
+		this.resetCursor();
+		this.removeBox();
+		this.lowlight();
+		setTimeout(function(){ window.snap = null }, 10);
+	},
+
+	handleEvent : function(event){
+		switch(event.type){
+			case 'unload':
+			case 'TabSelect':
+				this.destroy();
+				break;
+
+			case 'mousedown':
+				if (event.button != 0) return false;
+				event.preventDefault();
+				event.stopPropagation();
+				this.browser.removeEventListener(event.type, this, true);
+				this.drawBox(event);
+				break;
+
+			case 'mousemove':
+				var moveX = event.screenX;
+				var moveY = event.screenY;
+				
+				// コンテンツエリア外の時は端に合わせる
+				if (moveX <= this.innerLeft) moveX = this.innerLeft;
+				else if (moveX >= this.innerRight) moveX = this.innerRight;
+				if (moveY <= this.innerTop) moveY = this.innerTop;
+				else if (moveY >= this.innerBottom) moveY = this.innerBottom;
+				this.box.moveTo(this.x > moveX? moveX : this.x, this.y > moveY? moveY : this.y);
+				this.box.width  = Math.abs(moveX - this.x);
+				this.box.height = Math.abs(moveY - this.y);
+				if (event.timeStamp - this.timeStamp > 200) {
+					this.boxLeft    = this.box.boxObject.screenX;
+					this.boxTop     = this.box.boxObject.screenY;
+					this.boxRight   = this.box.boxObject.width  + this.boxLeft;
+					this.boxBottom  = this.box.boxObject.height + this.boxTop;
+					this.highlight();
+					this.timeStamp = event.timeStamp;
+				}
+				break;
+
+			case 'mouseup':
+				if (event.button != 0) return;
+
+				this.boxLeft    = this.box.boxObject.screenX;
+				this.boxTop     = this.box.boxObject.screenY;
+				this.boxRight   = this.box.boxObject.width  + this.boxLeft;
+				this.boxBottom  = this.box.boxObject.height + this.boxTop;
+				this.highlight();
+
+				var hasLink     = this.contains.some(function(e) e instanceof HTMLAnchorElement);
+				var hasCheckbox = this.contains.some(function(e) e instanceof HTMLInputElement && e.type === 'checkbox');
+				
+				if (!hasLink && !hasCheckbox) {
+					this.destroy();
+					return;
+				}
+				this.resetCursor();
+				this.popup.className = (hasLink? 'hasLink' : '') + (hasCheckbox? ' hasCheckbox': '');
+				this.popup.addEventListener('popuphiding', this, false);
+				this.popup.openPopupAtScreen(event.screenX, event.screenY, false);
+				this.removeListener();
+				break;
+
+			case 'popuphiding':
+				this.popup.removeEventListener('popuphiding', this, false);
+				this.removeBox();
+				this.lowlight();
+				setTimeout(function(){ window.snap = null }, 10);
+				break;
+		}
+	},
+
+	cancel: function(event) {
+		event.preventDefault();
+		event.stopPropagation();
+	},
+
+	getWindowList: function() {
+		this.windowList = (function(win) {
+			var array = [win];
+			for (var i = 0, l = win.frames.length; i < l; i++) {
+				array.push.apply(array, arguments.callee(win.frames[i]));
+			}
+			return array;
+		})(window.content);
+	},
+
+	setCursor: function() {
+		this.rootList = this.windowList.map(function(win) win.document.documentElement);
+		this.rootList.forEach(function(root) {
+			root.style.setProperty('cursor', 'crosshair', 'important');
+		});
+	},
+	
+	resetCursor: function() {
+		this.rootList.forEach(function(root){
+			if (root)
+				root.style.setProperty('cursor', '', '');
+		});
+	},
+
+	highlight: function() {// 要改善
+		// 要素の走査と mozInnerScreenX の取得は最初だけであとは使い回す
+		this.elements = [];
+		this.windowList.forEach(function(win){
+			var x = win.mozInnerScreenX * this.zoom;
+			var y = win.mozInnerScreenY * this.zoom;
+			var arr = Array.map(win.document.querySelectorAll(this.HIGHLIGHT_SELECTOR), function(elem){
+				// 要素にプロパティを付ける
+				elem.defStyle = elem.getAttribute('style');
+				elem.win = win;
+				elem.x = x;
+				elem.y = y;
+				return elem;
+			});
+			this.elements.push.apply(this.elements, arr);
+		}, this);
+
+		func.apply(this);
+		this.highlight = func;
+
+		function func(){
+			this.contains = this.elements.filter(function(elem) {
+				if ( this.inBox(elem, elem.win, elem.x, elem.y) ) {
+					elem.style.outline = '1px solid ' + this.HIGHLIGHT_COLOR;
+					return true;
+				} else {
+					elem.style.cssText = elem.defStyle || '';
+					return false;
+				}
+			}, this);
+		}
+	},
+
+	lowlight: function() {
+		if (!this.elements) return;
+		this.elements.forEach(function(elem) {
+			if (elem.defStyle == null)
+				elem.removeAttribute('style');
+			else 
+				elem.style.cssText = elem.defStyle;
+		}, this);
+	},
+
+	drawBox: function(event){
+		if (!event) return;
+
+		var winUtils = window.content.QueryInterface(Ci.nsIInterfaceRequestor).getInterface(Ci.nsIDOMWindowUtils);
+		this.zoom =  winUtils.screenPixelsPerCSSPixel;
+		//this.zoom = gBrowser.mCurrentBrowser.markupDocumentViewer.fullZoom;
+
+		this.timeStamp = event.timeStamp;
+		this.x = event.screenX;
+		this.y = event.screenY;
+
+		this.innerTop    = this.zoom * (content.mozInnerScreenY);
+		this.innerLeft   = this.zoom * (content.mozInnerScreenX);
+		this.innerBottom = this.zoom * (this.innerTop + content.innerHeight);
+		this.innerRight  = this.zoom * (this.innerLeft + content.innerWidth);
+		
+		this.box.width = 1;
+		this.box.height = 1;
+		this.box.addEventListener('popuphiding', this.cancel, false);
+		this.box.openPopupAtScreen(this.x, this.y);
+		this.addListener();
+	},
+
+	removeBox : function(event){
+		this.box.removeEventListener('popuphiding', this.cancel, false);
+		this.box.width = 1;
+		this.box.height = 1;
+		this.box.hidePopup();
+	},
+/*
+	getElements : function(selector){
+		var resArray = [];
+		this.windowList.forEach(function(win){
+			var x = win.mozInnerScreenX;
+			var y = win.mozInnerScreenY;
+			var arr = Array.filter(win.document.querySelectorAll(selector), function(elem) {
+				return this.inBox(elem, win, x, y);
+			}, this);
+			resArray.push.apply(resArray, arr);
+		}, this);
+		return resArray;
+	},
+*/
+	inBox: function (elem, win, x, y){
+		if (elem.offsetHeight === 0) return false;
+		if (elem instanceof HTMLAnchorElement)
+			elem = elem.getElementsByTagName('img')[0] || elem;
+		var style = win.getComputedStyle(elem, null);
+		if (style.visibility === 'hidden' || style.opacity === '0' || style.width == '1px') return false;
+		var rect = elem.getBoundingClientRect();
+		return this.boxLeft <= (rect.right * this.zoom) + x &&
+		       this.boxTop <= (rect.bottom * this.zoom) + y &&
+		       this.boxRight >= (rect.left * this.zoom) + x && 
+		       this.boxBottom >= (rect.top * this.zoom) + y;
+	},
+
+	log: function(str) {
+		Application.console.log('SnapLinks: ' + str)
+	},
+
+	openLinks : function(regexp){
+		var links = this.contains.filter(function(elem) elem instanceof HTMLAnchorElement );
+		for (var i = 0, l = links.length; i < l; i++){
+			var href = links[i].href;
+			if (/^(javascript\:|mailto\:)/i.test(href)) {
+				this.log(RegExp.$1 + '～で始まる URL は読み込みません');
+				continue;
+			}
+			if (!regexp || regexp.test(href)) 
+				gBrowser.addTab(href, { ownerTab: gBrowser.mCurrentTab });
+		}
+	},
+	copyLinks : function(regexp){
+		var links = this.contains.filter(function(elem) elem instanceof HTMLAnchorElement && (!regexp || regexp.test(elem.href)) );
+		var h = links.map(function(a) a.href);
+		
+		if (h.length){
+			Cc["@mozilla.org/widget/clipboardhelper;1"].getService(Ci.nsIClipboardHelper).copyString(h.join('\n'));
+			document.getElementById('statusbar-display').setAttribute('label', h.length + ' Copy.');
+		}
+	},
+	imageOnePage : function(){
+		var src = this.contains.map(function(elem){
+			return elem instanceof HTMLAnchorElement && /\.(jpe?g|png|gif|bmp)$/i.test(elem.href)?
+				'<img src="' + elem.href + '">' :
+				'';
+		});
+		gBrowser.addTab("data:text/html," + escape(src.join('\n')));
+	},
+	checkbox : function(check){
+		this.contains.forEach(function(elem){
+			if (elem instanceof HTMLInputElement && elem.type === 'checkbox')
+				elem.checked = check;
+		});
+	},
+	toggleCheckbox : function(){
+		this.contains.forEach(function(elem){
+			if (elem instanceof HTMLInputElement && elem.type === 'checkbox')
+				elem.checked = !elem.checked;;
+		});
+	},
+};
+
+  ]]></script>
+</overlay>

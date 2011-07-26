@@ -1,0 +1,114 @@
+■このスクリプトについて
+Greasemonkey の様な .user.js を読み込むスクリプトです。
+拙作の uAutoPagerize と連携することができます。
+
+■Greasemonkey との違い
+・管理マネージャはない
+・.user.js を書き替えてもそのままでは反響されない
+　　Rebuild が必要（アイコンをホイールクリック or メニューから実行）
+・AutoPagerize の SITEINFO など、一部データを JSON に保存
+・@require, @Resource などのデータも JSON に保存
+・Scriptish を参考に一部機能を実装
+
+■対応するメタデータ
+・@name
+・@namespace
+・@include
+・@exclude
+・@require
+・@resource
+・@noframes(Scriptish)
+・@run-at(Chrome)
+これ以外のメタデータは動作には関係ありません。
+
+■対応する GM_API
+・GM_log
+・GM_xmlhttpRequest
+・GM_openInTab
+・GM_registerMenuCommand
+・GM_getResourceText
+・GM_getResourceURL
+・GM_addStyle
+・GM_setValue
+・GM_getValue
+・GM_listValues
+・GM_deleteValue
+・GM_setClipboard(Scriptish)
+
+■今後の予定
+・とくになし
+
+■更新履歴
+・version 0.1.6.1
+　uAutoPagerize との連携ができなかったのを修正
+　.user.js 間での連携は多分できません。。
+・version 0.1.6
+　色々修正。unsafeWindow 使ってて動かなかった物が動くかも
+　Firefox 3.6 は切り捨てた
+
+・version 0.1.5.1
+　0.1.5.1 フレームページを開いた際にエラー吐いてたのを仮修正
+・version 0.1.5
+　アイコンをアドレスバーに移動した
+　@run-at document-start の動作を Scriptish に合わせた（今までは Chrome 風）
+　user.jsの最後の行が行コメントだった場合に Syntax Error になったのを修正
+
+・version 0.1.4
+　Firefox 3.6 での動作確認をやめた
+　@run-at document-start に対応
+　globalStorageをやめてjsonにした(プライベートモードで読み出せなかったので)
+
+・version 0.1.3
+　chrome の @run-at に対応（3.6.12 以降限定）
+　4.0b7 で uAutoPagerize との連携を修正
+
+・version 0.1.2
+　@require, @Resource で読み込みに失敗することがあったのを修正
+　Scriptish の @noframes, GM_setClipboard に対応
+　Mac で SCRIPTS_FOLDER 未指定時の処理を修正したつもり（未テスト）
+
+・version 0.1.1
+　typo 修正
+
+・version 0.1.0
+　Firefox 4.0b6 に対応
+　window.content を汚染しない仕組みを実装
+
+・version 0.0.9
+　GM_registerMenuCommand に対応
+　globalStorage を利用した
+　SCRIPTS_FOLDER で指定したフォルダが無いとエラーになるのを適当に修正
+
+・version 0.0.8
+　アイコン化
+　フォルダを開くメニューとスクリプト保存メニューを追加
+　GM_listValues, GM_getResourceText 改善
+　@require, GM_getResourceURL 対応
+
+・version 0.0.7
+　GM_deleteValue を修正
+
+・version 0.0.6
+　.tld に対応
+　ステータスバーの文字が変わらないのを修正
+
+・version 0.0.5
+　JavaScript 1.8(E4X等) が使えるように
+
+・version 0.0.4
+　typo 修正
+
+・version 0.0.3
+　設定を pref に書くようにした
+　意図せず unsafeWindow にアクセスできたのを修正
+
+・version 0.0.2
+　凡ミス修正
+
+・version 0.0.1
+　初版公開
+
+■
+アイコンは FAMFAMFAM さんからお借りしています。
+http://www.famfamfam.com/lab/icons/silk/preview.php
+
