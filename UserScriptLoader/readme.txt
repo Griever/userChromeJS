@@ -6,8 +6,8 @@ Greasemonkey の様な .user.js を読み込むスクリプトです。
 ・管理マネージャはない
 ・.user.js を書き替えてもそのままでは反響されない
 　　Rebuild が必要（アイコンをホイールクリック or メニューから実行）
+　　0.1.7 でスクリプトをキャッシュしないオプションを追加
 ・AutoPagerize の SITEINFO など、一部データを JSON に保存
-・@require, @Resource などのデータも JSON に保存
 ・Scriptish を参考に一部機能を実装
 
 ■対応するメタデータ
@@ -19,6 +19,8 @@ Greasemonkey の様な .user.js を読み込むスクリプトです。
 ・@resource
 ・@noframes(Scriptish)
 ・@run-at(Chrome)
+・@delay(Scriptish)
+・@bookmarklet(NinjaKit)
 これ以外のメタデータは動作には関係ありません。
 
 ■対応する GM_API
@@ -34,11 +36,33 @@ Greasemonkey の様な .user.js を読み込むスクリプトです。
 ・GM_listValues
 ・GM_deleteValue
 ・GM_setClipboard(Scriptish)
+・GM_unregisterMenuCommand(Scriptish)
+・GM_enableMenuCommand(Scriptish)
+・GM_disableMenuCommand(Scriptish)
+・GM_generateUUID(Scriptish)
+・GM_getMetadata(Scriptish)
 
 ■今後の予定
 ・とくになし
 
 ■更新履歴
+・version 0.1.7
+　書きなおした
+　スクリプトを編集時に日本語のファイル名のファイルを開けなかったのを修正
+　複数のウインドウを開くとバグることがあったのを修正
+　.user.js 間で window を共有できるように修正
+　.tld を簡略化した
+　スクリプトをキャッシュしないオプションを追加
+　GM_safeHTMLParser, GM_generateUUID に対応
+　GM_unregisterMenuCommand, GM_enableMenuCommand, GM_disableMenuCommand に対応
+　GM_getMetadata に対応(返り値は Array or undefined)
+　GM_openInTab に第２引数を追加
+　@require, @resource のファイルをフォルダに保存するようにした
+　@delay に対応
+　@bookmarklet に対応（from NinjaKit）
+　GLOBAL_EXCLUDES を用意した
+　セキュリティを軽視してみた
+
 ・version 0.1.6.1
 　uAutoPagerize との連携ができなかったのを修正
 　.user.js 間での連携は多分できません。。

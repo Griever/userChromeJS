@@ -4,10 +4,13 @@
 // @namespace      http://d.hatena.ne.jp/Griever/
 // @author         Griever
 // @include        main
+// @license        MIT License
 // @compatibility  Firefox 4
-// @version        0.0.2
-// @note           メニューを色々追加
-// @note           Rebuild の処理を最適化した
+// @version        0.0.3
+// @note           CSSEntry クラスを作った
+// @note           スタイルのテスト機能を作り直した
+// @note           ファイルが削除された場合 rebuild 時に CSS を解除しメニューを消すようにした
+// @note           uc で読み込まれた .uc.css の再読み込みに仮対応
 // ==/UserScript==
 
 /****** 使い方 ******
@@ -42,27 +45,21 @@ if (window.UCL) {
 }
 
 window.UCL = {
+	USE_UC: "UC" in window,
 	AGENT_SHEET: Ci.nsIStyleSheetService.AGENT_SHEET,
 	USER_SHEET : Ci.nsIStyleSheetService.USER_SHEET,
+	readCSS    : {},
+	get disabled_list() {
+		let obj = [];
+		try {
+			obj = this.prefs.getComplexValue("disabled_list", Ci.nsISupportsString).data.split("|");
+		} catch(e) {}
+		delete this.disabled_list;
+		return this.disabled_list = obj;
+	},
 	get prefs() {
 		delete this.prefs;
 		return this.prefs = Services.prefs.getBranch("UserCSSLoader.")
-	},
-	get readCSS() {
-		let obj = {};
-		try {
-			let s = this.prefs.getComplexValue("disabled_list", Ci.nsISupportsString).data.split("|");
-			if (s.length) {
-				s.forEach(function(aLeafName) {
-					obj[aLeafName] = {
-						enabled: false,
-						lastModifiedTime: 0
-					}
-				});
-			}
-		} catch(e) {}
-		delete this.readCSS;
-		return this.readCSS = obj;
 	},
 	get styleSheetServices(){
 		delete this.styleSheetServices;
@@ -92,16 +89,15 @@ window.UCL = {
 	},
 	init: function() {
 		var menu = $E(
-			<menu id="usercssloader-menu"
-				    label="CSS"
-				    accesskey="C">
+			<menu id="usercssloader-menu" label="CSS" accesskey="C">
 				<menupopup id="usercssloader-menupopup">
 					<menu label={U("ﾒﾆｭ━━━(ﾟ∀ﾟ)━━━!!")}
 					      accesskey="C">
 						<menupopup id="usercssloader-submenupopup">
 							<menuitem label="Rebuild"
 							          accesskey="R"
-							          oncommand="UCL.importAll();" />
+							          acceltext="Alt + R"
+							          oncommand="UCL.rebuild();" />
 							<menuseparator />
 							<menuitem label={U("新規作成")}
 							          accesskey="N"
@@ -109,12 +105,12 @@ window.UCL = {
 							<menuitem label={U("CSS フォルダを開く")}
 							          accesskey="O"
 							          oncommand="UCL.openFolder();" />
-<!-- 
 							<menuitem label={U("userChrome.css を編集")}
+							          hidden="true"
 							          oncommand="UCL.editUserCSS('userChrome.css')" />
 							<menuitem label={U("userContent.css を編集")}
+							          hidden="true"
 							          oncommand="UCL.editUserCSS('userContent.css')" />
--->
 							<menuseparator />
 							<menuitem label={U("スタイルのテスト (Chrome)")}
 							          id="usercssloader-test-chrome"
@@ -129,7 +125,14 @@ window.UCL = {
 							          oncommand="UCL.searchStyle();" />
 						</menupopup>
 					</menu>
-					<menuseparator />
+					<menu label=".uc.css" accesskey="U" hidden={!(UCL.USE_UC)}>
+						<menupopup id="usercssloader-ucmenupopup">
+							<menuitem label="Rebuild(.uc.js)"
+							          oncommand="UCL.UCrebuild();" />
+							<menuseparator id="usercssloader-ucsepalator"/>
+						</menupopup>
+					</menu>
+					<menuseparator id="ucl-sepalator"/>
 				</menupopup>
 			</menu>
 		);
@@ -137,23 +140,21 @@ window.UCL = {
 		var mainMenubar = document.getElementById("main-menubar");
 		mainMenubar.appendChild(menu);
 
-		var key = $E(<key id="usercssloader-rebuild-key" oncommand="UCL.importAll();" key="R" modifiers="alt" />);
+		var key = $E(<key id="usercssloader-rebuild-key" oncommand="UCL.rebuild();" key="R" modifiers="alt" />);
 		document.getElementById("mainKeyset").appendChild(key)
 
-		if (!window.inspectObject) {
-			document.getElementById("usercssloader-test-chrome").hidden = true;
-			document.getElementById("usercssloader-test-content").hidden = true;
-		}
-		this.importAll();
+		this.rebuild();
 		this.initialized = true;
+		if (UCL.USE_UC) {
+			setTimeout(function() {
+				UCL.UCcreateMenuitem();
+			}, 1000);
+		}
 		window.addEventListener("unload", this, false);
 	},
 	uninit: function() {
-		var dis = [];
-		for (let [name, obj] in Iterator(this.readCSS)) {
-			if (!obj.enabled) dis.push(name);
-		}
-		let str = Cc["@mozilla.org/supports-string;1"].createInstance(Ci.nsISupportsString);
+		var dis = [x for(x in this.readCSS) if (!this.readCSS[x].enabled)];
+		var str = Cc["@mozilla.org/supports-string;1"].createInstance(Ci.nsISupportsString);
 		str.data = dis.join("|");
 		this.prefs.setComplexValue("disabled_list", Ci.nsISupportsString, str);
 		window.removeEventListener("unload", this, false);
@@ -170,91 +171,67 @@ window.UCL = {
 			case "unload": this.uninit(); break;
 		}
 	},
-	importAll: function() {
+	rebuild: function() {
 		let ext = /\.css$/i;
+		let not = /\.uc\.css/i;
 		let files = this.FOLDER.directoryEntries.QueryInterface(Ci.nsISimpleEnumerator);
 
 		while (files.hasMoreElements()) {
 			let file = files.getNext().QueryInterface(Ci.nsIFile);
-			if (!ext.test(file.leafName)) continue;
-			this.setCSS(file);
+			if (!ext.test(file.leafName) || not.test(file.leafName)) continue;
+			let CSS = this.loadCSS(file);
+			CSS.flag = true;
 		}
-		if (this.initialized) XULBrowserWindow.statusTextField.label = U("Rebuild しました");
+		for (let [leafName, CSS] in Iterator(this.readCSS)) {
+			if (!CSS.flag) {
+				CSS.enabled = false;
+				delete this.readCSS[leafName];
+			}
+			delete CSS.flag;
+			this.rebuildMenu(leafName);
+		}
+		if (this.initialized)
+			XULBrowserWindow.statusTextField.label = U("Rebuild しました");
 	},
-	setCSS: function(aFile, isEnable) {
-		// CSS の読み込み、メニューの作成・チェックの変更を全てこの関数で行う
-		var aLeafName = "";
-		if (typeof aFile == "string") {
-			// aFile がファイル名だった場合
-			aLeafName = aFile;
-			aFile = this.getFileFromLeafName(aFile);
-		} else {
-			aLeafName = aFile.leafName;
-		}
-
-		var isExists = aFile.exists(); // ファイルが存在したら true
-		var lastModifiedTime = isExists ? aFile.lastModifiedTime : 0;
-
-		if (!this.readCSS[aLeafName]) {
-			if (!isExists) return; // これは呼ばれないハズ…
-			this.readCSS[aLeafName] = {
-				enabled: true,
-				lastModifiedTime: 1
-			};
-		}
-		if (arguments.length == 1) {
-			isEnable = this.readCSS[aLeafName].enabled;
-		}
-
-		var isForced = this.readCSS[aLeafName].lastModifiedTime != lastModifiedTime; // ファイルに変更があれば true
-		this.readCSS[aLeafName].lastModifiedTime = lastModifiedTime;
-
-		var fileURL = Services.io.getProtocolHandler("file").QueryInterface(Ci.nsIFileProtocolHandler).getURLSpecFromFile(aFile);
-		var SHEET = /^xul-|\.as\.css$/i.test(aLeafName) ? this.AGENT_SHEET : this.USER_SHEET;
-		var uri = makeURI(fileURL);
-
-		if (this.styleSheetServices.sheetRegistered(uri, SHEET)) {
-			// すでにこのファイルが読み込まれている場合
-			if (!isEnable || !isExists){
-				this.styleSheetServices.unregisterSheet(uri, SHEET);
+	loadCSS: function(aFile) {
+		var CSS = this.readCSS[aFile.leafName];
+		if (!CSS) {
+			CSS = this.readCSS[aFile.leafName] = new CSSEntry(aFile);
+			if (this.disabled_list.indexOf(CSS.leafName) === -1) {
+				CSS.enabled = true;
 			}
-			else if (isForced) {
-				// 解除後に登録し直す
-				this.styleSheetServices.unregisterSheet(uri, SHEET);
-				this.styleSheetServices.loadAndRegisterSheet(uri, SHEET);
-			}
-		} else {
-			// このファイルは読み込まれていない
-			if (isEnable && isExists) {
-				this.styleSheetServices.loadAndRegisterSheet(uri, SHEET);
-			}
+		} else if (CSS.enabled) {
+			CSS.enabled = true;
 		}
-
-		if (this.initialized && isEnable && isForced) log(U(aLeafName + " の更新を確認しました。"));
-
+		return CSS;
+	},
+	rebuildMenu: function(aLeafName) {
+		var CSS = this.readCSS[aLeafName];
 		var menuitem = document.getElementById("usercssloader-" + aLeafName);
+		if (!CSS) {
+			if (menuitem)
+				menuitem.parentNode.removeChild(menuitem);
+			return;
+		}
+
 		if (!menuitem) {
 			menuitem = document.createElement("menuitem");
 			menuitem.setAttribute("label", aLeafName);
 			menuitem.setAttribute("id", "usercssloader-" + aLeafName);
-			menuitem.setAttribute("class", "usercssloader-item " + (SHEET == this.AGENT_SHEET? "AGENT_SHEET" : "USER_SHEET"));
+			menuitem.setAttribute("class", "usercssloader-item " + (CSS.SHEET == this.AGENT_SHEET? "AGENT_SHEET" : "USER_SHEET"));
 			menuitem.setAttribute("type", "checkbox");
 			menuitem.setAttribute("autocheck", "false");
 			menuitem.setAttribute("oncommand", "UCL.toggle('"+ aLeafName +"');");
 			menuitem.setAttribute("onclick", "UCL.itemClick(event);");
 			document.getElementById("usercssloader-menupopup").appendChild(menuitem);
 		}
-		if (isExists) {
-			this.readCSS[aLeafName].enabled = isEnable;
-			menuitem.setAttribute("checked", isEnable);
-			menuitem.setAttribute("hidden", "false");
-		} else {
-			menuitem.parentNode.removeChild(menuitem);
-			delete this.readCSS[aLeafName];
-		}
+		menuitem.setAttribute("checked", CSS.enabled);
 	},
 	toggle: function(aLeafName) {
-		this.setCSS(aLeafName, !this.readCSS[aLeafName].enabled);
+		var CSS = this.readCSS[aLeafName];
+		if (!CSS) return;
+		CSS.enabled = !CSS.enabled;
+		this.rebuildMenu(aLeafName);
 	},
 	itemClick: function(event) {
 		if (event.button == 0) return;
@@ -279,26 +256,10 @@ window.UCL = {
 	},
 	styleTest: function(aWindow) {
 		aWindow || (aWindow = this.getFocusedWindow());
-		var doc = aWindow.document;
-		var { host, href } = aWindow.location;
-		var code = "@namespace url(" + doc.documentElement.namespaceURI + ");\n";
-		code += !host || host.indexOf(".") === -1?
-			"@-moz-document url(" + href + ") {\n\n\n\n}":
-			"@-moz-document domain(" + host + ") {\n\n\n\n}";
-
-		var style = doc.createElementNS("http://www.w3.org/1999/xhtml", "style");
-		style.type = "text/css";
-		var node = style.appendChild(doc.createTextNode(code));
-		doc.documentElement.appendChild(style);
-		
-		var domi = window.openDialog('chrome://inspector/content/object.xul', '_blank', 'chrome,all,dialog=no', node);
-		domi.addEventListener("load", function(event) {
-			event.currentTarget.removeEventListener(event.type, arguments.callee, false);
-			domi.document.title = U(href + " へのスタイルをテストできます。ウインドウを閉じるとスタイルも削除されます。");
-			domi.addEventListener("unload", function(event) {
-				style.parentNode.removeChild(style);
-			}, false);
-		}, false);
+		new CSSTester(aWindow, function(tester){
+			if (tester.saved)
+				UCL.rebuild();
+		});
 	},
 	searchStyle: function() {
 		let win = this.getFocusedWindow();
@@ -314,7 +275,6 @@ window.UCL = {
 		this.edit(file);
 	},
 	edit: function(aFile) {
-		//if (!aFile.exists()) return alert(aFile.leafName + U(" がありません"));
 		var editor = Services.prefs.getCharPref("view_source.editor.path");
 		if (!editor) return alert(U("エディタのパスが未設定です。\n view_source.editor.path を設定してください"));
 		try {
@@ -335,6 +295,245 @@ window.UCL = {
 		if (!/\.css$/.test(aLeafName)) aLeafName += ".css";
 		let file = this.getFileFromLeafName(aLeafName);
 		this.edit(file);
+	},
+	UCrebuild: function() {
+		let re = /^file:.*\.uc\.css(?:\?\d+)?$/i;
+		let query = "?" + new Date().getTime();
+		Array.slice(document.styleSheets).forEach(function(css){
+			if (!re.test(css.href)) return;
+			if (css.ownerNode) {
+				css.ownerNode.parentNode.removeChild(css.ownerNode);
+			}
+			let pi = document.createProcessingInstruction('xml-stylesheet','type="text/css" href="'+ css.href.replace(/\?.*/, '') + query +'"');
+			document.insertBefore(pi, document.documentElement);
+		});
+		UCL.UCcreateMenuitem();
+	},
+	UCcreateMenuitem: function() {
+		let sep = $("usercssloader-ucsepalator");
+		let popup = sep.parentNode;
+		if (sep.nextSibling) {
+			let range = document.createRange();
+			range.setStartAfter(sep);
+			range.setEndAfter(popup.lastChild);
+			range.deleteContents();
+			range.detach();
+		}
+
+		let re = /^file:.*\.uc\.css(?:\?\d+)?$/i;
+		Array.slice(document.styleSheets).forEach(function(css) {
+			if (!re.test(css.href)) return;
+			let fileURL = decodeURIComponent(css.href).split("?")[0];
+			let aLeafName = fileURL.split("/").pop();
+			let m = document.createElement("menuitem");
+			m.setAttribute("label", aLeafName);
+			m.setAttribute("tooltiptext", fileURL);
+			m.setAttribute("id", "usercssloader-" + aLeafName);
+			m.setAttribute("type", "checkbox");
+			m.setAttribute("autocheck", "false");
+			m.setAttribute("checked", "true");
+			m.setAttribute("oncommand", "this.setAttribute('checked', !(this.css.disabled = !this.css.disabled));");
+			m.setAttribute("onclick", "UCL.UCItemClick(event);");
+			m.css = css;
+			popup.appendChild(m);
+		});
+	},
+	UCItemClick: function(event) {
+		if (event.button == 0) return;
+		event.preventDefault();
+		event.stopPropagation();
+
+		if (event.button == 1) {
+			event.target.doCommand();
+		}
+		else if (event.button == 2) {
+			closeMenus(event.target);
+			let fileURL = event.currentTarget.getAttribute("tooltiptext");
+			let file = Services.io.getProtocolHandler("file").QueryInterface(Ci.nsIFileProtocolHandler).getFileFromURLSpec(fileURL);
+			this.edit(file);
+		}
+	},
+};
+
+function CSSEntry(aFile) {
+	this.path = aFile.path;
+	this.leafName = aFile.leafName;
+	this.lastModifiedTime = 1;
+	this.SHEET = /^xul-|\.as\.css$/i.test(this.leafName) ? 
+		Ci.nsIStyleSheetService.AGENT_SHEET: 
+		Ci.nsIStyleSheetService.USER_SHEET;
+}
+CSSEntry.prototype = {
+	sss: Cc["@mozilla.org/content/style-sheet-service;1"].getService(Ci.nsIStyleSheetService),
+	_enabled: false,
+	get enabled() {
+		return this._enabled;
+	},
+	set enabled(isEnable) {
+		var aFile = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsILocalFile)
+		aFile.initWithPath(this.path);
+	
+		var isExists = aFile.exists(); // ファイルが存在したら true
+		var lastModifiedTime = isExists ? aFile.lastModifiedTime : 0;
+		var isForced = this.lastModifiedTime != lastModifiedTime; // ファイルに変更があれば true
+
+		var fileURL = Services.io.getProtocolHandler("file").QueryInterface(Ci.nsIFileProtocolHandler).getURLSpecFromFile(aFile);
+		var uri = Services.io.newURI(fileURL, null, null);
+
+		if (this.sss.sheetRegistered(uri, this.SHEET)) {
+			// すでにこのファイルが読み込まれている場合
+			if (!isEnable || !isExists) {
+				this.sss.unregisterSheet(uri, this.SHEET);
+			}
+			else if (isForced) {
+				// 解除後に登録し直す
+				this.sss.unregisterSheet(uri, this.SHEET);
+				this.sss.loadAndRegisterSheet(uri, this.SHEET);
+			}
+		} else {
+			// このファイルは読み込まれていない
+			if (isEnable && isExists) {
+				this.sss.loadAndRegisterSheet(uri, this.SHEET);
+			}
+		}
+		if (this.lastModifiedTime !== 1 && isEnable && isForced) {
+			log(U(this.leafName + " の更新を確認しました。"));
+		}
+		this.lastModifiedTime = lastModifiedTime;
+		return this._enabled = isEnable;
+	},
+};
+
+function CSSTester(aWindow, aCallback) {
+	this.win = aWindow || window;
+	this.doc = this.win.document;
+	this.callback = aCallback;
+	this.init();
+}
+CSSTester.prototype = {
+	sss: Cc["@mozilla.org/content/style-sheet-service;1"].getService(Ci.nsIStyleSheetService),
+	preview_code: "",
+	saved: false,
+	init: function() {
+		this.dialog = openDialog(
+			"data:text/html;charset=utf8,"+encodeURIComponent('<!DOCTYPE HTML><html lang="ja"><head><title>CSSTester</title></head><body></body></html>'),
+			"",
+			"width=550,height=400,dialog=no");
+		this.dialog.addEventListener("load", this, false);
+	},
+	destroy: function() {
+		this.preview_end();
+		this.dialog.removeEventListener("unload", this, false);
+		this.previewButton.removeEventListener("click", this, false);
+		this.saveButton.removeEventListener("click", this, false);
+		this.closeButton.removeEventListener("click", this, false);
+	},
+	handleEvent: function(event) {
+		switch(event.type) {
+			case "click":
+				if (event.button != 0) return;
+				if (this.previewButton == event.currentTarget) {
+					this.preview();
+				}
+				else if (this.saveButton == event.currentTarget) {
+					this.save();
+				}
+				else if (this.closeButton == event.currentTarget) {
+					this.dialog.close();
+				}
+				break;
+			case "load":
+				var doc = this.dialog.document;
+				doc.body.innerHTML = <![CDATA[
+					<style type="text/css">
+						:not(input):not(select) { padding: 0px; margin: 0px; }
+						table { border-spacing: 0px; }
+						body, html, #main, #textarea { width: 100%; height: 100%; }
+						#textarea { font-family: monospace; }
+					</style>
+					<table id="main">
+						<tr height="100%">
+							<td colspan="4"><textarea id="textarea"></textarea></td>
+						</tr>
+						<tr height="40">
+							<td><input type="button" value="Preview" /></td>
+							<td><input type="button" value="Save" /></td>
+							<td width="80%"><span class="log"></span></td>
+							<td><input type="button" value="Close" /></td>
+						</tr>
+					</table>
+				]]>.toString();
+				this.textbox = doc.querySelector("textarea");
+				this.previewButton = doc.querySelector('input[value="Preview"]');
+				this.saveButton = doc.querySelector('input[value="Save"]');
+				this.closeButton = doc.querySelector('input[value="Close"]');
+				this.logField = doc.querySelector('.log');
+
+				var code = "@namespace url(" + this.doc.documentElement.namespaceURI + ");\n";
+				code += this.win.location.protocol.indexOf("http") === 0?
+					"@-moz-document domain(" + this.win.location.host + ") {\n\n\n\n}":
+					"@-moz-document url(" + this.win.location.href + ") {\n\n\n\n}";
+				this.textbox.value = code;
+				this.dialog.addEventListener("unload", this, false);
+				this.previewButton.addEventListener("click", this, false);
+				this.saveButton.addEventListener("click", this, false);
+				this.closeButton.addEventListener("click", this, false);
+
+				this.textbox.focus();
+				let p = this.textbox.value.length - 3;
+				this.textbox.setSelectionRange(p, p);
+
+				break;
+			case "unload":
+				this.destroy();
+				this.callback(this);
+				break;
+		}
+	},
+	preview: function() {
+		var code = this.textbox.value;
+		if (!code || !/\:/.test(code))
+			return;
+		code = "data:text/css;charset=utf-8," + encodeURIComponent(this.textbox.value);
+		if (code == this.preview_code)
+			return;
+		this.preview_end();
+		var uri = Services.io.newURI(code, null, null);
+		this.sss.loadAndRegisterSheet(uri, Ci.nsIStyleSheetService.AGENT_SHEET);
+		this.preview_code = code;
+		this.log("Preview");
+	},
+	preview_end: function() {
+		if (this.preview_code) {
+			let uri = Services.io.newURI(this.preview_code, null, null);
+			this.sss.unregisterSheet(uri, Ci.nsIStyleSheetService.AGENT_SHEET);
+			this.preview_code = "";
+		}
+	},
+	save: function() {
+		var data = this.textbox.value;
+		if (!data) return;
+
+		var fp = Cc["@mozilla.org/filepicker;1"].createInstance(Ci.nsIFilePicker);
+		fp.init(window, "", Ci.nsIFilePicker.modeSave);
+		fp.appendFilter("CSS Files","*.css");
+		fp.defaultExtension = "css";
+		if (window.UCL)
+			fp.displayDirectory = UCL.FOLDER;
+		var res = fp.show();
+		if (res != fp.returnOK && res != fp.returnReplace) return;
+
+		var suConverter = Cc["@mozilla.org/intl/scriptableunicodeconverter"].createInstance(Ci.nsIScriptableUnicodeConverter);
+		suConverter.charset = "UTF-8";
+		data = suConverter.ConvertFromUnicode(data);
+		var foStream = Cc["@mozilla.org/network/file-output-stream;1"].createInstance(Ci.nsIFileOutputStream);
+		foStream.init(fp.file, 0x02 | 0x08 | 0x20, 0664, 0);
+		foStream.write(data, data.length);
+		foStream.close();
+		this.saved = true;
+	},
+	log: function() {
+		this.logField.textContent = new Date().toLocaleFormat("%H:%M:%S") + ": " + $A(arguments);
 	}
 };
 

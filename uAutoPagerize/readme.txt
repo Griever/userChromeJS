@@ -12,6 +12,12 @@ Greasemonkey 版の AutoPagerize（以下本家）が eval を多用するので
 ・とくになし
 
 ■更新履歴
+・version 0.2.0
+　INCLUDE を設定できるようにした
+　INCLUDE, EXCLUDE をワイルドカード式にした
+　アイコンに右クリックメニューを付けた
+　スクロールするまでは次を読み込まないオプションをつけた
+
 ・version 0.1.9.1
 　Yahoo! 用の例外処理を修正
 ・version 0.1.9 

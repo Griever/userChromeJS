@@ -1,7 +1,5 @@
-�쐬���� userChromeJS �̃t�@�C���u����
-�Ƃ��ɋL�ڂ̂Ȃ����̂� MIT License �ł��肢���܂��B
+作成した userChromeJS のファイル置き場
+とくに記載のないものは MIT License でお願いします。
 
-�����p�͑S�Ď��ȐӔC�ł��肢���܂��B
-��{�I�ɍ�҂̃T�|�[�g�͖������̂Ǝv���Ă��������B
-
-userChromeJS �������킩��Ȃ��l�� (�E�́E)���!!
+ご利用は全て自己責任でお願いします。
+基本的に作者のサポートは無いものと思ってください。
