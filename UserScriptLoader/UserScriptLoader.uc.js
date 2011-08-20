@@ -5,7 +5,8 @@
 // @include        main
 // @compatibility  Firefox 5.0
 // @license        MIT License
-// @version        0.1.7
+// @version        0.1.7.1
+// @note           0.1.7.1 .tld がうまく動作していなかったのを修正
 // @note           書きなおした
 // @note           スクリプトを編集時に日本語のファイル名のファイルを開けなかったのを修正
 // @note           複数のウインドウを開くとバグることがあったのを修正
@@ -148,7 +149,7 @@ USL.ScriptEntry.prototype = {
 			url = url.replace(/\*+/g, ".*");
 			url = url.replace(/^\.\*\:?\/\//, "https?://");
 			url = url.replace(/^\.\*/, "https?:.*");
-			url = url.replace(/^([^:]*?:\/\/[^\/\*]+)\.tld\b/,"$1\.(?:com|net|org|info|(?:(?:co|ne|or)\\.)?jp)/");
+			url = url.replace(/^([^:]*?:\/\/[^\/\*]+)\.tld\b/,"$1\.(?:com|net|org|info|(?:(?:co|ne|or)\\.)?jp)");
 			//url = url.replace(/\.tld\//,"\.(?:com|net|org|info|(?:(?:co|ne|or)\\.)?jp)/");
 			return "^" + url + "$";
 		}).join('|');
