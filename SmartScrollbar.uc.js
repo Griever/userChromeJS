@@ -2,9 +2,8 @@
 // @name           SmartScrollbar.uc.js
 // @namespace      http://d.hatena.ne.jp/Griever/
 // @include        main
-// @version        0.0.3
-// @note           CSS を微調整
-// @note           SmartScrollbar に改名
+// @version        0.0.4
+// @note           encodeURIComponent を使うように修正
 // ==/UserScript==
 // thx! http://www.geocities.jp/adsldenet/past/sample.html
 
@@ -51,7 +50,7 @@
     css = css.replace(/html\|html > /g, 'html|*:not(html|select) > ');
   
   var sss = Cc['@mozilla.org/content/style-sheet-service;1'].getService(Ci.nsIStyleSheetService);
-  var uri = makeURI('data:text/css;charset=UTF=8,' + encodeURI(css));
+  var uri = makeURI('data:text/css;charset=UTF=8,' + encodeURIComponent(css));
 
   var p = document.getElementById('devToolsSeparator');
   var m = document.createElement('menuitem');
