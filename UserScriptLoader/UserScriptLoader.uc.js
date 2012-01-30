@@ -5,7 +5,8 @@
 // @include        main
 // @compatibility  Firefox 5.0
 // @license        MIT License
-// @version        0.1.7.1
+// @version        0.1.7.2
+// @note           0.1.7.2 document-startが機能していなかったのを修正
 // @note           0.1.7.1 .tld がうまく動作していなかったのを修正
 // @note           書きなおした
 // @note           スクリプトを編集時に日本語のファイル名のファイルを開けなかったのを修正
@@ -98,7 +99,7 @@ USL.ScriptEntry.prototype = {
 		this.requireSrc = "";
 		this.resources = {};
 
-		this.run_at = "run-at" in this.metadata ? this.metadata["run-at"] : "document-end";
+		this.run_at = "run-at" in this.metadata ? this.metadata["run-at"][0] : "document-end";
 		this.name = "name" in this.metadata ? this.metadata.name[0] : this.leafName;
 		if (this.metadata.delay) {
 			let delay = parseInt(this.metadata.delay[0], 10);
