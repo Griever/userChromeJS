@@ -5,7 +5,8 @@
 // @include        main
 // @compatibility  Firefox 5.0
 // @license        MIT License
-// @version        0.1.7.2
+// @version        0.1.7.3
+// @note           0.1.7.3 Google Reader NG Filterがとりあえず動くように修正
 // @note           0.1.7.2 document-startが機能していなかったのを修正
 // @note           0.1.7.1 .tld がうまく動作していなかったのを修正
 // @note           書きなおした
@@ -906,7 +907,7 @@ USL.injectScripts = function(safeWindow, rsflag) {
 		sandbox.unsafeWindow = safeWindow.wrappedJSObject;
 		sandbox.document     = safeWindow.document;
 		sandbox.console      = console;
-		sandbox.window       = winObj;
+		sandbox.window       = script.run_at === "document-start" ? safeWindow : winObj;
 
 		sandbox.__proto__ = safeWindow;
 		USL.evalInSandbox(script, sandbox);
