@@ -5,7 +5,8 @@
 // @include        main
 // @compatibility  Firefox 5.0
 // @license        MIT License
-// @version        0.1.7.3
+// @version        0.1.7.4
+// @note           0.1.7.4 GM_xmlhttpRequest の url が相対パスが使えなかったのを修正
 // @note           0.1.7.3 Google Reader NG Filterがとりあえず動くように修正
 // @note           0.1.7.2 document-startが機能していなかったのを修正
 // @note           0.1.7.1 .tld がうまく動作していなかったのを修正
@@ -241,6 +242,8 @@ USL.API = function(script, sandbox, win, doc) {
 	this.GM_xmlhttpRequest = function(obj) {
 		if(typeof(obj) != 'object' || (typeof(obj.url) != 'string' && !(obj.url instanceof String))) return;
 
+		var baseURI = Services.io.newURI(win.location.href, null, null);
+		obj.url = Services.io.newURI(obj.url, null, baseURI);
 		var req = new XMLHttpRequest();
 		req.open(obj.method || 'GET',obj.url,true);
 		if(typeof(obj.headers) == 'object') for(var i in obj.headers) req.setRequestHeader(i,obj.headers[i]);
