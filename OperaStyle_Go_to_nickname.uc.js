@@ -2,21 +2,36 @@
 // @name           OperaStyle_gotoNickname.uc.js
 // @namespace      http://d.hatena.ne.jp/Griever/
 // @include        main
-// @varsion        0.0.3
-// @note           keyconfig等で gotoNickname.open() を実行
-// @note           gotoNickname.open("google"); でも可能。
+// @varsion        0.0.4
+// @note           最後に使ったキーワードを記憶するようにした
 // ==/UserScript==
+/*
+Shift＋F2 又は keyconfig 等で gotoNickname.open() を実行。
+gotoNickname.open("google"); でも可能。
+*/
+if (window.gotoNickname) {
+	window.gotoNickname.destroy();
+	delete window.gotoNickname;
+}
 
 window.gotoNickname= {
-	beep: false, //ビープ音を鳴らす
-	complete: true, // 候補を表示
-	alawaysCheck: false,// 毎回キーワードを取得し直す
-	
+	BEEP         : false, //ビープ音を鳴らす
+	SHOW_COMPLETE: true,  // 候補を表示
+	ALAWAYS_CHECK: false, // 毎回キーワードを取得し直す
+	lastMatchedKeyword: '',
+	get keywords(){
+		return this._keywords || (this._keywords = this.getKeywords());
+	},
+	get _beep() {
+		delete this._beep;
+		return this._beep = Cc["@mozilla.org/sound;1"].createInstance(Ci.nsISound);
+	},
+	beep: function() {
+		this._beep.beep();
+	},
 	getKeywords: function(){
-		var bmsvc = Components.classes["@mozilla.org/browser/nav-bookmarks-service;1"]
-		                      .getService(Components.interfaces.nsINavBookmarksService);
-		var ios = Components.classes["@mozilla.org/network/io-service;1"]
-		                    .getService(Components.interfaces.nsIIOService);
+		var bmsvc = Cc["@mozilla.org/browser/nav-bookmarks-service;1"].getService(Ci.nsINavBookmarksService);
+		var ios = Cc["@mozilla.org/network/io-service;1"].getService(Ci.nsIIOService);
 
 		// http://www.xuldev.org/blog/?p=181
 		function flatChildNodes(aItemId) {
@@ -26,6 +41,8 @@ window.gotoNickname= {
 				var childNode = parentNode.getChild(i);
 				if (PlacesUtils.nodeIsBookmark(childNode)){
 					var uri = ios.newURI(childNode.uri, null, null);
+					if (uri.spec.indexOf('%s') >= 0)
+						continue;
 					var keyword = bmsvc.getKeywordForURI(uri);
 					if (keyword) ret.push(keyword);
 				}
@@ -36,8 +53,7 @@ window.gotoNickname= {
 			}
 			return ret;
 		}
-
-		this.keywords = flatChildNodes(1).filter(function(e, i, a) a.indexOf(e) === i);
+		return flatChildNodes(1).filter(function(e, i, a) a.indexOf(e) === i);
 	},
 
 	open: function(str){
@@ -50,76 +66,59 @@ window.gotoNickname= {
 			, window.screenY + window.innerHeight/2 - 40
 			, false
 		);
-		if (this.alawaysCheck)
-			this.getKeywords();
+		if (this.ALAWAYS_CHECK)
+			this._keywords = null;
 	},
 
-	handleEvent: function(e){
-		switch(e.type){
-			case 'input':
-				var value = this.input.value;
-				if (value == '') {
-					this.label.value = '';
-					return;
-				}
-				var matchKeywords = this.keywords.filter(function(e) e.indexOf(value) === 0);
-				if (matchKeywords.length === 1) {
-					loadURI(getShortcutOrURI(matchKeywords[0],{}));
-					this.panel.hidePopup();
-				} else if (this.complete) {
-					this.label.value = matchKeywords.join(' ');
-				}
-				return;
-				this.panel.hidePopup();
-				break;
-			case 'keypress':
-				if (e.keyCode != e.DOM_VK_RETURN || (e.ctrlKey || e.shiftKey || e.altKey))
-					return;
-				loadURI(getShortcutOrURI(this.input.value ,{}));
-				this.panel.hidePopup();
-				break;
-			case 'popupshown':
-				this.input.focus();
-				if (this.beep)
-					Components.classes["@mozilla.org/sound;1"]
-					          .createInstance(Components.interfaces.nsISound)
-					          .beep();
-				break;
-			case 'popuphidden':
-				this.input.value = '';
-				this.label.value = '';
-				break;
-			case 'unload':
-				this.uninit();
-				break;
+	onPopupshown: function(event) {
+		this.input.select();
+		if (this.BEEP) this.beep();
+	},
+	onPopuphidden: function(event) {
+		this.input.value = this.lastMatchedKeyword;
+		this.label.value = '';
+	},
+	onInput: function(event) {
+		var value = this.input.value;
+		if (value == '') {
+			this.label.value = '';
+			return;
+		}
+		var matchKeywords = this.keywords.filter(function(e) e.indexOf(value) === 0);
+		if (matchKeywords.length === 1) {
+			loadURI(getShortcutOrURI(matchKeywords[0],{}));
+			content.focus();
+			this.lastMatchedKeyword = matchKeywords[0];
+			this.panel.hidePopup();
+		} else if (this.SHOW_COMPLETE) {
+			this.label.value = matchKeywords.join(' ');
 		}
 	},
-	
+	onKeypress: function(event) {
+		var {keyCode:k, charCode:w, ctrlKey:c, shiftKey:s, altKey:a} = event;
+		if (k === event.DOM_VK_RETURN && !c && !s && !a) {
+			loadURI(getShortcutOrURI(this.input.value ,{}));
+			content.focus();
+			this.panel.hidePopup();
+		}
+	},
 	init: function(){
 		this.panel = $('mainPopupSet').appendChild($E(
-			<panel id="gotoNickname-panel"
-			       width="300"
-			       height="80">
-				<description>
-					{U("ブックマークのキーワードを入力してください")}
-				</description>
-				<textbox id="gotoNickname-input"/>
-				<label id="gotoNickname-label" crop="end"/>
+			<panel id="gotoNickname-panel" width="300" height="80"
+			       onpopupshown="gotoNickname.onPopupshown(event);"
+			       onpopuphidden="gotoNickname.onPopuphidden(event);">
+				<description value={U("ブックマークのキーワードを入力してください")} />
+				<textbox id="gotoNickname-input" 
+				         onkeypress="gotoNickname.onKeypress(event)"
+				         oninput="gotoNickname.onInput(event);"/>
+				<label id="gotoNickname-label" crop="end" value=""/>
 			</panel>
 		));
 		this.input = $('gotoNickname-input');
+		this.input.inputField.style.imeMode = "inactive";
 		this.label = $('gotoNickname-label');
 		this.panel.style.backgroundColor = '-moz-dialog';
 		this.panel.style.padding = '10px';
-		
-		if (!this.alawaysCheck)
-			this.getKeywords();
-		
-		this.panel.addEventListener('popupshown', this, false);
-		this.panel.addEventListener('popuphidden', this, false);
-		this.input.addEventListener('input', this, false);
-		this.input.addEventListener('keypress', this, false);
-		window.addEventListener('unload', this, false);
 		
 		$('mainKeyset').appendChild($E(
 			<key keycode="VK_F2" modifiers="shift" oncommand="gotoNickname.open();"/>
@@ -143,15 +142,10 @@ window.gotoNickname= {
 			return frag.childNodes.length < 2 ? frag.firstChild : frag;
 		}
 	},
-		
-	uninit: function(){
-		this.panel.removeEventListener('popupshown', this, false);
-		this.panel.removeEventListener('popuphidden', this, false);
-		this.input.removeEventListener('input', this, false);
-		this.input.removeEventListener('keypress', this, false);
-		window.removeEventListener('unload', this, false);
+	destroy: function() {
+		var elem = document.getElementById('gotoNickname-panel');
+		if (elem) elem.parentNode.removeChild(elem);
 	},
-		
 };
 
 gotoNickname.init();
