@@ -6,8 +6,9 @@
 // @namespace      http://d.hatena.ne.jp/Griever/
 // @description    Snap Links for userChromeJS
 // @include        main
-// @version        2012/03/08 
-// @note           フレーム跨いだりツールチップ使うのをやめた
+// @version        2012/04/09
+// @note           CSS が適用されていなかったのを修正
+// @note           2012/03/08 フレーム跨いだりツールチップ使うのをやめた
 // ==/UserScript==
  -->
 <!--
@@ -18,16 +19,16 @@ FireGestures や keyconfig で snapLinks(); を実行
 snapLinks(event);
 
 -->
-<?xml-stylesheet href="data:text/css,@namespace%20url('http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul');
+<?xml-stylesheet href="data:text/css;charset=utf-8,@namespace%20url('http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul');
 
-#snapLinksMenupopup.hasLink .hasLink,
-#snapLinksMenupopup.hasImageLink .hasImageLink,
-#snapLinksMenupopup.hasCheckbox .hasCheckbox
+%23snapLinksMenupopup.hasLink .hasLink,
+%23snapLinksMenupopup.hasImageLink .hasImageLink,
+%23snapLinksMenupopup.hasCheckbox .hasCheckbox
   { display: -moz-box !important; }
 
-#snapLinksMenupopup:not(.hasLink) .hasLink,
-#snapLinksMenupopup:not(.hasImageLink) .hasImageLink,
-#snapLinksMenupopup:not(.hasCheckbox) .hasCheckbox 
+%23snapLinksMenupopup:not(.hasLink) .hasLink,
+%23snapLinksMenupopup:not(.hasImageLink) .hasImageLink,
+%23snapLinksMenupopup:not(.hasCheckbox) .hasCheckbox 
   { display: none !important; }
 
 " type="text/css"?>
@@ -104,10 +105,12 @@ window.SnapLinksUCJSClass.prototype = {
 		} else {
 			this.doc.addEventListener("mousedown", this, true);
 		}
+		this.doc.addEventListener("pagehide", this, true);
 	},
 	uninit: function() {
 		this.doc.removeEventListener("mousedown", this, true);
 		this.doc.removeEventListener("mousemove", this, true);
+		this.doc.removeEventListener("pagehide", this, true);
 		removeEventListener("mouseup", this, true);
 		setTimeout(function(self){
 			self.doc.removeEventListener("click", self, true);
@@ -188,6 +191,9 @@ window.SnapLinksUCJSClass.prototype = {
 			case "click":
 				event.preventDefault();
 				event.stopPropagation();
+				break;
+			case "pagehide":
+				this.destroy();
 				break;
 		}
 	},
