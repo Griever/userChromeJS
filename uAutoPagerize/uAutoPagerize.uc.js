@@ -4,9 +4,11 @@
 // @description    loading next page and inserting into current page.
 // @include        main
 // @compatibility  Firefox 5.0
-// @version        0.2.2
-// @note           設定ファイルを利用できるようにした
-// @note           コンテキストメニューが意外と邪魔だったので葬った
+// @version        0.2.3
+// @note           kakaku.com のスペック検索に対応
+// @note           Fx7 くらいから xml で動かなくなってたのを修正
+// @note           ver 0.2.2 で nextLink に form 要素が指定されている場合などに動かなくなってたのを修正
+// @note           0.2.2 コンテキストメニューが意外と邪魔だったので葬った
 // @note           0.2.1 コンテキストメニューに次のページを開くメニューを追加
 // @note           0.2.1 区切りのアイコンをクリックしても色が変わらなかったのを修正
 // @note           0.2.0 INCLUDE を設定できるようにした
@@ -68,6 +70,12 @@ var MY_SITEINFO = [
 		,pageElement : 'id("ynDetail detailHeadline")'
 		,insertBefore: 'id("detailHeadline")/a/following-sibling::*'
 		,exampleUrl  : 'http://dailynews.yahoo.co.jp/fc/sports/iwakuma_hisashi/?1331001936'
+	},
+	{
+		url          : '^http://kakaku\\.com/specsearch/\\d+'
+		,nextLink    : 'id("AutoPagerizeNextLink")'
+		,pageElement : '//tr[@class="bgColor02"][1]|//tr[@class="bgColor02"][1]/following-sibling::tr'
+		,exampleUrl  : 'http://kakaku.com/specsearch/0150/'
 	}
 ];
 
@@ -513,6 +521,38 @@ var ns = window.uAutoPagerize = {
 					img.removeAttribute('data-src');
 				});
 			});
+		} else if (/^http:\/\/kakaku\.com\/specsearch\/\d+/.test(locationHref)) {
+			let nextLink = '//img[@alt="次へ"]/parent::a[starts-with(@onclick, "return page")]';
+			let next = getFirstElementByXPath(nextLink, doc);
+			if (next) {
+				let df = function (_doc) {
+					var form = _doc.querySelector('form[name="specForm"]');
+					if (!form) return;
+					var next = getFirstElementByXPath(nextLink, _doc);
+					if (!next) return;
+					next.id = 'AutoPagerizeNextLink';
+					var post = Array.slice(form.elements).map(function(elem) {
+						if (elem.name === 'Page')
+							return 'Page=' + /\d+/.exec(next.getAttribute('onclick'));
+						if (/^(?:button|submit)$/.test(elem.type) || 
+						    !elem.value || 
+						    (elem.type == 'checkbox' && !elem.checked))
+							return '';
+						return elem.name + '=' + encodeURIComponent(elem.value);
+					});
+					let postData = post.filter(function(e) !!e).join('&');
+					next.href = locationHref + '##?' + postData;
+				};
+
+				let rf = function (opt) {
+					opt.method = 'post';
+					opt.send = opt.url.replace(/.*?[#?]+/, '');
+					opt.headers['content-type'] = 'application/x-www-form-urlencoded';
+				};
+				miscellaneous.push(df);
+				win.documentFilters.push(df);
+				win.requestFilters.push(rf);
+			}
 		}
 
 		win.setTimeout(function(){
@@ -644,7 +684,7 @@ AutoPager.prototype = {
 			this.info[key] = val;
 		}
 		
-		var url = nextLink ? nextLink.href : this.getNextURL(this.doc);
+		var url = this.getNextURL(this.doc);
 		if ( !url ) {
 			debug("getNextURL returns null.", this.info.nextLink);
 			return;
@@ -926,7 +966,9 @@ AutoPager.prototype = {
 		}, this);
 	},
 	getNextURL : function(doc) {
-		var nextLink = getFirstElementByXPath(this.info.nextLink, doc);
+		var nextLink = doc instanceof HTMLElement ? 
+			doc :
+			getFirstElementByXPath(this.info.nextLink, doc);
 		if (nextLink) {
 			var nextValue = nextLink.getAttribute('href') ||
 				nextLink.getAttribute('action') || nextLink.value;
@@ -1057,23 +1099,26 @@ function getFirstElementByXPath(xpath, node) {
 }
 
 function getXPathResult(xpath, node, resultType) {
-	var doc = node.ownerDocument || node
-	// Fx 7 でリゾルバがおかしい？
-	return doc.evaluate(xpath, node, null, resultType, null)
-	
-	var resolver = doc.createNSResolver(node.documentElement || node)
-	// Use |node.lookupNamespaceURI('')| for Opera 9.5
-	var defaultNS = node.lookupNamespaceURI(null)
+	var doc = node.ownerDocument || node;
+	var resolver = doc.createNSResolver(node.documentElement || node);
+	var defaultNS = null;
+
+	try {
+		defaultNS = (node.nodeType == node.DOCUMENT_NODE) ?
+			node.documentElement.lookupNamespaceURI(null):
+			node.lookupNamespaceURI(null);
+	} catch(e) {}
+
 	if (defaultNS) {
-		const defaultPrefix = '__default__'
-		xpath = addDefaultPrefix(xpath, defaultPrefix)
-		var defaultResolver = resolver
+		const defaultPrefix = '__default__';
+		xpath = addDefaultPrefix(xpath, defaultPrefix);
+		var defaultResolver = resolver;
 		resolver = function (prefix) {
 			return (prefix == defaultPrefix)
-				? defaultNS : defaultResolver.lookupNamespaceURI(prefix)
+				? defaultNS : defaultResolver.lookupNamespaceURI(prefix);
 		}
 	}
-	return doc.evaluate(xpath, node, resolver, resultType, null)
+	return doc.evaluate(xpath, node, resolver, resultType, null);
 }
 
 function addDefaultPrefix(xpath, prefix) {
