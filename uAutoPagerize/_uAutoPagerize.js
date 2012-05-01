@@ -22,3 +22,6 @@ var MY_SITEINFO = [
 		pageElement : 'id("tweets-list")',
 	},
 ];
+
+// 本体に組み込まれている MICROFORMAT を利用するか？
+USE_MICROFORMAT = false;

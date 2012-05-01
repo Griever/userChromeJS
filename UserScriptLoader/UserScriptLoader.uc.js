@@ -5,7 +5,8 @@
 // @include        main
 // @compatibility  Firefox 5.0
 // @license        MIT License
-// @version        0.1.7.7
+// @version        0.1.7.8
+// @note           0.1.7.8 window.open や target="_blank" で実行されないのを修正
 // @note           0.1.7.7 @delay 周りのバグを修正
 // @note           0.1.7.6 require で外部ファイルの取得がうまくいかない場合があるのを修正
 // @note           0.1.7.5 0.1.7.4 にミスがあったので修正
@@ -593,6 +594,8 @@ USL.handleEvent = function (event) {
 			var win = event.target.defaultView;
 			win.USL_registerCommands = {};
 			win.USL_run = [];
+			if (USL.disabled) return;
+			if (USL.readScripts.length === 0) return;
 			this.injectScripts(win);
 			break;
 		case "unload":
@@ -825,22 +828,25 @@ USL.iconClick = function(event){
 	}
 };
 
+USL.retryInject = function(safeWin) {
+	function func(event) {
+		safeWin.removeEventListener("readystatechange", func, true);
+		if (event.target.URL === "about:blank") return;
+		USL.injectScripts(event.target.defaultView, true);
+	}
+	safeWin.addEventListener("readystatechange", func, true);
+};
+
 USL.injectScripts = function(safeWindow, rsflag) {
-	if (USL.disabled) return;
-	if (USL.readScripts.length === 0) return;
 	var aDocument = safeWindow.document;
 	var locationHref = safeWindow.location.href;
 
-	if (locationHref == "" && aDocument.URL == "about:blank") {
-		// document-start でフレームを開いた際にちょっとおかしいので…
-		if (rsflag) return;
-		safeWindow.addEventListener('readystatechange', function(event){
-			if (event.target.URL === "about:blank") return;
-			event.currentTarget.removeEventListener(event.type, arguments.callee, true);
-			USL.injectScripts(event.target.defaultView, true);
-		}, true);
-		return;
-	}
+	// document-start でフレームを開いた際にちょっとおかしいので…
+	if (!rsflag && locationHref == "" && safeWindow.frameElement)
+		return USL.retryInject(safeWindow);
+	// target="_blank" で about:blank 状態で開かれるので…
+	if (!rsflag && locationHref == 'about:blank')
+		return USL.retryInject(safeWindow);
 
 	if (USL.GLOBAL_EXCLUDES_REGEXP.test(locationHref)) return;
 
