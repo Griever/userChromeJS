@@ -24,4 +24,4 @@ var MY_SITEINFO = [
 ];
 
 // 本体に組み込まれている MICROFORMAT を利用するか？
-USE_MICROFORMAT = false;
+USE_MICROFORMAT = true;
