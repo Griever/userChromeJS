@@ -4,7 +4,8 @@
 // @description    loading next page and inserting into current page.
 // @include        main
 // @compatibility  Firefox 5.0
-// @version        0.2.6
+// @version        0.2.7
+// @note           0.2.7 Firefox 14 でとりあえず動くように修正
 // @note           0.2.6 組み込みの SITEINFO を修正
 // @note           0.2.5 MICROFORMAT も設定ファイルから追加・無効化できるようにした
 // @note           0.2.5 スペースアルクで動かなくなってたのを修正
@@ -52,7 +53,7 @@ var MY_SITEINFO = [
 		,exampleUrl : 'http://eow.alc.co.jp/%E3%81%82%E3%82%8C/UTF-8/ http://eow.alc.co.jp/are'
 	},
 	{
-		url         : '^http://(?:images|www)\\.google(?:\\.[^./]{2,3}){1,2}/(images\\?|search\\?.*tbm=isch)'
+		url         : '^https?://(?:images|www)\\.google(?:\\.[^./]{2,3}){1,2}/(images\\?|search\\?.*tbm=isch)'
 		,nextLink   : 'id("nn")/parent::a | id("navbar navcnt nav")//td[last()]/a'
 		,pageElement: 'id("ImgCont ires")/table | id("ImgContent")'
 		,exampleUrl : 'http://images.google.com/images?ndsp=18&um=1&safe=off&q=image&sa=N&gbv=1&sout=1'
@@ -66,7 +67,7 @@ var MY_SITEINFO = [
 	{
 		url          : '^https?://mobile\\.twitter\\.com/'
 		,nextLink    : '//div[contains(concat(" ",normalize-space(@class)," "), " w-button-more ")]/a[@href]'
-		,pageElement : '//div[@class="timeline"]/table[@class="tweet"]'
+		,pageElement : '//div[@class="timeline"]/table[@class="tweet"] | //div[@class="user-list"]/table[@class="user-item"]'
 		,exampleUrl  : 'https://mobile.twitter.com/ https://mobile.twitter.com/search?q=css'
 	},
 	{
@@ -859,7 +860,7 @@ AutoPager.prototype = {
 		}
 		this.win.requestFilters.forEach(function(i) { i(opt) }, this);
 		this.state = 'loading';
-		this.req = GM_xmlhttpRequest(opt, isSameDomain? this.win : null);
+		this.req = GM_xmlhttpRequest(opt);
 	},
 	requestLoad : function(res){
 		var before = res.URI.host;
