@@ -3,18 +3,27 @@
 // @namespace      http://d.hatena.ne.jp/Griever/
 // @include        main
 // @description    keyconfig の代わり
-// @version        0.0.1
+// @license        MIT License
+// @compatibility  Firefox 16
+// @charset        UTF-8
+// @version        0.0.2
+// @note           0.0.2 メニューを右クリックで設定ファイルを開けるようにした
+// @note           0.0.2 Meta キーを装飾キーに使えるようになったかもしれない（未テスト）
+// @note           0.0.2 Windows キーを装飾キーに使えるようになったかもしれない（未テスト Firefox 17 以降）
 // ==/UserScript==
 
 var KeyChanger = {
-	filename : '_keychanger.js',
-	chromePath : Cc["@mozilla.org/file/directory_service;1"].getService(Ci.nsIProperties)
-		.get("UChrm", Ci.nsILocalFile).path + '\\',
+	get file() {
+		var aFile = Services.dirsvc.get("UChrm", Ci.nsILocalFile);
+		aFile.appendRelativePath("_keychanger.js");
+		delete this.file;
+		return this.file = aFile;
+	},
 	makeKeyset : function(isAlert){
 		var s = new Date();
 		var keys = this.makeKeys();
 		if (!keys)
-			return this.alert('KeyChanger', 'Load error.')
+			return this.alert('KeyChanger', 'Load error.');
 
 		var keyset = document.getElementById('keychanger-keyset');
 		if (keyset)
@@ -37,74 +46,96 @@ var KeyChanger = {
 		}
 	},
 	makeKeys : function(){
-		var str = this.readFile(this.chromePath + this.filename);
+		var str = this.loadText(this.file);
 		if (!str)
 			return null;
 
 		var sandbox = new Components.utils.Sandbox( new XPCNativeWrapper(window) );
-		var keys = Components.utils.evalInSandbox('var keys = {};' + str + ';keys;', sandbox);
+		var keys = Components.utils.evalInSandbox('var keys = {};\n' + str + ';\nkeys;', sandbox);
 		if (!keys)
 			return null;
 		var dFrag = document.createDocumentFragment();
 
-		for (let n in keys){
-			let keyString = n.toUpperCase().split('+');
-			let modifiers = '', key, keycode, k;
+		Object.keys(keys).forEach(function(n) {
+			let keyString = n.toUpperCase().split("+");
+			let modifiers = "", key, keycode, k;
 			
-			for (let i = 0, l = keyString.length; i < l ; i++){
+			for (let i = 0, l = keyString.length; i < l ; i++) {
 				k = keyString[i];
-				if (k == 'CTRL' || k == 'CONTROL' || k == 'ACCEL'){
-					modifiers += 'accel,';
-				}else 
-				if (k == 'SHIFT'){
-					modifiers += 'shift,';
-				}else 
-				if (k == 'ALT'){
-					modifiers += 'alt,';
-				}else 
-				{
-					if (k == ''){
-						key = '+';
-					}else 
-					if (k.length == 1){
-						key = k;
-					}else
-					{
-						switch(k){
-						case 'BACKSPACE':
-						case 'BKSP':
-						case 'BS':
-							keycode = 'VK_BACK'; break;
-						case 'RET':
-						case 'ENTER':
-							keycode = 'VK_RETURN'; break;
-						case 'ESC':
-							keycode = 'VK_ESCAPE'; break;
-						case 'PAGEUP':
-						case 'PAGE UP':
-						case 'PGUP':
-						case 'PUP':
-							keycode = 'VK_PAGE_UP'; break;
-						case 'PAGEDOWN':
-						case 'PAGE DOWN':
-						case 'PGDN':
-						case 'PDN':
-							keycode = 'VK_PAGE_DOWN'; break;
-						case 'TOP':
-							keycode = 'VK_UP'; break;
-						case 'BOTTOM':
-							keycode = 'VK_DOWN'; break;
-						case 'INS':
-							keycode = 'VK_INSERT'; break;
-						case 'DEL':
-							keycode = 'VK_DELETE'; break;
-						default:
-							keycode = k.indexOf('VK_') == -1? keycode = 'VK_' + k : k;
+				switch(k) {
+					case "CTRL":
+					case "CONTROL":
+					case "ACCEL":
+						modifiers += "accel,";
+						break;
+					case "SHIFT":
+						modifiers += "shift,";
+						break;
+					case "ALT":
+					case "OPTION":
+						modifiers += "alt,";
+						break;
+					case "META":
+					case "COMMAND":
+						modifiers += "meta,";
+						break;
+					case "OS":
+					case "WIN":
+					case "WINDOWS":
+					case "HYPER":
+					case "SUPER":
+						modifiers += "os,";
+						break;
+					case "":
+						key = "+";
+						break;
+					case "BACKSPACE":
+					case "BKSP":
+					case "BS":
+						keycode = "VK_BACK";
+						break;
+					case "RET":
+					case "ENTER":
+						keycode = "VK_RETURN";
+						break;
+					case "ESC":
+						keycode = "VK_ESCAPE";
+						break;
+					case "PAGEUP":
+					case "PAGE UP":
+					case "PGUP":
+					case "PUP":
+						keycode = "VK_PAGE_UP";
+						break;
+					case "PAGEDOWN":
+					case "PAGE DOWN":
+					case "PGDN":
+					case "PDN":
+						keycode = "VK_PAGE_DOWN";
+						break;
+					case "TOP":
+						keycode = "VK_UP";
+						break;
+					case "BOTTOM":
+						keycode = "VK_DOWN";
+						break;
+					case "INS":
+						keycode = "VK_INSERT";
+						break;
+					case "DEL":
+						keycode = "VK_DELETE";
+						break;
+					default:
+						if (k.length === 1) {
+							key = k;
+						} else if (k.indexOf("VK_") === -1) {
+							keycode = "VK_" + k;
+						} else {
+							keycode = k;
 						}
-					}
+						break;
 				}
 			}
-
 			let elem = document.createElement('key');
 			if (modifiers !== '')
 				elem.setAttribute('modifiers', modifiers.slice(0, -1));
@@ -114,50 +145,73 @@ var KeyChanger = {
 				elem.setAttribute('keycode', keycode);
 
 			let cmd = keys[n];
-			switch(typeof cmd){
-			case 'function': elem.setAttribute('oncommand', cmd.toSource() + '(event)'); break;
-			case 'object': for (let a in cmd) elem.setAttribute(a, cmd[a]); break;
-			default: elem.setAttribute('oncommand', cmd);
+			switch(typeof cmd) {
+				case 'function':
+					elem.setAttribute('oncommand', '(' + cmd.toSource() + ').call(this, event);');
+					break;
+				case 'object':
+					Object.keys(cmd).forEach(function(a){
+						elem.setAttribute(a, cmd[a]);
+					}, this);
+					break;
+				default:
+					elem.setAttribute('oncommand', cmd);
 			}
 			dFrag.appendChild(elem);
-		}
+		}, this);
 		return dFrag;
 	},
 	createMenuitem : function(){
 		var menuitem = document.createElement('menuitem');
 		menuitem.setAttribute('label', 'Reload KeyChanger script');
 		menuitem.setAttribute('oncommand', 'KeyChanger.makeKeyset(true);');
+		menuitem.setAttribute('onclick', 'if (event.button == 2) { event.preventDefault(); KeyChanger.edit(KeyChanger.file); }');
 		var insPos = document.getElementById('devToolsSeparator');
 		insPos.parentNode.insertBefore(menuitem, insPos);
 	},
-	readFile: function (aPath) {
-		try{
-			var file = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsILocalFile);
-			file.initWithPath(aPath);
+	loadText: function(aFile) {
+		var fstream = Cc["@mozilla.org/network/file-input-stream;1"].createInstance(Ci.nsIFileInputStream);
+		var sstream = Cc["@mozilla.org/scriptableinputstream;1"].createInstance(Ci.nsIScriptableInputStream);
+		fstream.init(aFile, -1, 0, 0);
+		sstream.init(fstream);
 
-			var fstream = Cc["@mozilla.org/network/file-input-stream;1"].createInstance(Ci.nsIFileInputStream);
-			var sstream = Cc["@mozilla.org/scriptableinputstream;1"].createInstance(Ci.nsIScriptableInputStream);
-			fstream.init(file, -1, 0, 0);
-			sstream.init(fstream); 
-			var data = "";
-			var str = sstream.read(4096);
-			while (str.length > 0) {
-				data += str;
-				str = sstream.read(4096);
-			}
-			sstream.close();
-			fstream.close();
-
-			var UI = Cc["@mozilla.org/intl/scriptableunicodeconverter"].createInstance(Ci.nsIScriptableUnicodeConverter);
-			UI.charset = "UTF-8";
-			return UI.ConvertToUnicode(data);
-		}catch(e){
-			return null;
-		}
+		var data = sstream.read(sstream.available());
+		try { data = decodeURIComponent(escape(data)); } catch(e) {}
+		sstream.close();
+		fstream.close();
+		return data;
 	},
 	alert : function(aTitle, aString){
 		Cc['@mozilla.org/alerts-service;1'].getService(Ci.nsIAlertsService)
 			.showAlertNotification('', aTitle, aString, false, "", null);
+	},
+	edit: function(aFile) {
+		if (!aFile || !aFile.exists() || !aFile.isFile()) return;
+		var editor = Services.prefs.getCharPref("view_source.editor.path");
+		if (!editor)
+			return this.log("エディタのパスが未設定です。\n view_source.editor.path を設定してください");
+
+		try {
+			var UI = Cc["@mozilla.org/intl/scriptableunicodeconverter"].createInstance(Ci.nsIScriptableUnicodeConverter);
+			UI.charset = window.navigator.platform.toLowerCase().indexOf("win") >= 0? "Shift_JIS": "UTF-8";
+			var path = UI.ConvertFromUnicode(aFile.path);
+			this.exec(editor, path);
+		} catch (e) {}
+	},
+	exec: function(path, arg){
+		var file    = Cc['@mozilla.org/file/local;1'].createInstance(Ci.nsILocalFile);
+		var process = Cc['@mozilla.org/process/util;1'].createInstance(Ci.nsIProcess);
+		try {
+			var a = (typeof arg == 'string' || arg instanceof String) ? arg.split(/\s+/) : [arg];
+			file.initWithPath(path);
+			process.init(file);
+			process.run(false, a, a.length);
+		} catch(e) {
+			this.log(e);
+		}
+	},
+	log: function() {
+		Services.console.logStringMessage("[KeyChanger] " + Array.slice(arguments));
 	},
 };
 
@@ -194,8 +248,7 @@ string はそのまま oncommand 属性に。
 object は for in でそのまま属性に。
 	例：keys.f1 = { id : 'test', oncommand : 'alert(this.id)' };
 	
-function は func.toSource() + "(event)" で oncommand 属性に。
-	this が key 要素ではなく ChromeWindow を返すので注意。
+function は "(" + func.toSource() + ").call(this, event);" で oncommand 属性に。
 
 
 スクリプトはこの辺を参考に調達してください。

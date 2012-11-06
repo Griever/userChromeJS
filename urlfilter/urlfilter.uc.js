@@ -7,13 +7,14 @@
 // @compatibility  Firefox 11
 // @charset        UTF-8
 // @include        main
-// @version        0.0.5
-// @note           全体的に書き換え
-// @note           グローバル変数名を変更
-// @note           メニューの操作性を変更
-// @note           最後にブロックした時間を記録するようにした
-// @note           json から ini に変更（ini が無い場合 json を読み込み ini を作る）
-// @note           Adblock のホワイトリスト（@@）と $image に対応
+// @version        0.0.6
+// @note           0.0.6 URL が異様に長いとフリーズする問題を修正
+// @note           0.0.5 全体的に書き換え
+// @note           0.0.5 グローバル変数名を変更
+// @note           0.0.5 メニューの操作性を変更
+// @note           0.0.5 最後にブロックした時間を記録するようにした
+// @note           0.0.5 json から ini に変更（ini が無い場合 json を読み込み ini を作る）
+// @note           0.0.5 Adblock のホワイトリスト（@@）と $image に対応
 // ==/UserScript==
 
 /*
@@ -249,6 +250,7 @@ window.gURLFilter = {
 		return this.file = aFile;
 	},
 
+/*
 	createFilterRegexp: function(aType) {
 		//if (!aType || aType === "all") {
 		//	return this._allRegExpFilter = new RegExp([
@@ -276,6 +278,8 @@ window.gURLFilter = {
 	set bubunFilter(val) this._bubunFilter = val,
 	set seikiFilter(val) this._seikiFilter = val,
 	set whiteFilter(val) this._whiteFilter = val,
+*/
+
 	getFocusedWindow: function(){
 		var win = document.commandDispatcher.focusedWindow;
 		return (!win || win == window) ? window.content : win;
@@ -572,6 +576,8 @@ window.gURLFilter = {
 			var {spec, host, scheme} = http.URI;
 			if (this.onceThroughURL === spec)
 				return this.onceThroughURL = null;
+//			if (spec.length > 1000)
+//				return this.log("URLが長過ぎます。\n" + spec);
 
 			var win = this.getRequesterWindow(http);
 			var {href:pageURL, host:pageHost, protocol:pageProtocol } = win ? win.location : { href:"", host:""};
@@ -579,7 +585,12 @@ window.gURLFilter = {
 			var isThird = !(scheme == pageProtocol && host == pageHost);
 			var matched;
 
-			var obj = this.scanX(spec, '', pageHost, isThird, isImage);
+			var obj = this.scanX(spec, "white", pageHost, isThird, isImage) || 
+				this.scanX(spec, "kanzen", pageHost, isThird, isImage) || 
+				this.scanX(spec, "zenpou", pageHost, isThird, isImage) || 
+				this.scanX(spec, "kouhou", pageHost, isThird, isImage) || 
+				this.scanX(spec, "bubun", pageHost, isThird, isImage) || 
+				this.scanX(spec, "seiki", pageHost, isThird, isImage);
 			if (obj) {
 				obj.count = new Date().getTime();
 				if (obj.type === "white") return;
@@ -599,27 +610,31 @@ window.gURLFilter = {
 		}
 	},
 	scanX: function(url, type, pageHost, isThird, isImage) {
-		if (type === "white" || !type && this.whiteFilter.test(url))
+		if (type === "white")
 			for each(let obj in this.white)
 				if (obj.match(url) && obj.matchDoller(pageHost, isThird, isImage))
 					return obj;
-		if (type === "kanzen" || !type && this.kanzenFilter.test(url))
-			for each(let obj in this.kanzen)
-				if (obj.match(url) && obj.matchDoller(pageHost, isThird, isImage))
-					return obj;
-		if (type === "zenpou" || !type && this.zenpouFilter.test(url))
+//		if (type === "kanzen")
+//			for each(let obj in this.kanzen)
+//				if (obj.match(url) && obj.matchDoller(pageHost, isThird, isImage))
+//					return obj;
+		var knzn = this.kanzen[url];
+		if (knzn && knzn.matchDoller(pageHost, isThird, isImage))
+			return knzn
+
+		if (type === "zenpou")
 			for each(let obj in this.zenpou)
 				if (obj.match(url) && obj.matchDoller(pageHost, isThird, isImage))
 					return obj;
-		if (type === "kouhou" || !type && this.kouhouFilter.test(url))
+		if (type === "kouhou")
 			for each(let obj in this.kouhou)
 				if (obj.match(url) && obj.matchDoller(pageHost, isThird, isImage))
 					return obj;
-		if (type === "bubun" || !type && this.bubunFilter.test(url))
+		if (type === "bubun")
 			for each(let obj in this.bubun)
 				if (obj.match(url) && obj.matchDoller(pageHost, isThird, isImage))
 					return obj;
-		if (type === "seiki" || !type && this.seikiFilter.test(url))
+		if (type === "seiki")
 			for each(let obj in this.seiki)
 				if (obj.match(url) && obj.matchDoller(pageHost, isThird, isImage))
 					return obj;
