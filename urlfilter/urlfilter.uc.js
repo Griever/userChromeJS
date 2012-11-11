@@ -7,7 +7,8 @@
 // @compatibility  Firefox 11
 // @charset        UTF-8
 // @include        main
-// @version        0.0.6
+// @version        0.0.7
+// @note           0.0.7 後方一致のフィルタが誤爆する問題を修正
 // @note           0.0.6 URL が異様に長いとフリーズする問題を修正
 // @note           0.0.5 全体的に書き換え
 // @note           0.0.5 グローバル変数名を変更
@@ -188,7 +189,10 @@ Filter.prototype = {
 			case "white" : return this.regexp.test(url);
 			case "kanzen": return url === this.word;
 			case "zenpou": return url.indexOf(this.word) === 0;
-			case "kouhou": return url.lastIndexOf(this.word) === url.length - this.word.length;
+			case "kouhou": 
+				let index = url.lastIndexOf(this.word);
+				if (index === -1) return false;
+				return index === url.length - this.word.length;
 			case "bubun" : return url.indexOf(this.word) >= 0;
 			case "seiki" : return this.regexp.test(url);
 			default: return false;
@@ -249,37 +253,6 @@ window.gURLFilter = {
 		delete this.file;
 		return this.file = aFile;
 	},
-
-/*
-	createFilterRegexp: function(aType) {
-		//if (!aType || aType === "all") {
-		//	return this._allRegExpFilter = new RegExp([
-		//		this.kanzenFilter.source,
-		//		this.zenpouFilter.source,
-		//		this.kouhouFilter.source,
-		//		this.bubunFilter.source, 
-		//		this.seikiFilter.source
-		//	].join("|"));
-		//}
-		var arr = [x.source for each(x in this[aType]) if (x.enable)];
-		return this["_"+ aType+"Filter"] = arr.length > 0 ? new RegExp(arr.join("|")) : /^a$/;
-	},
-	//get allRegExpFilter() this._allRegExpFilter || this.createFilterRegexp(),
-	get kanzenFilter() this._kanzenFilter || this.createFilterRegexp("kanzen"),
-	get zenpouFilter() this._zenpouFilter || this.createFilterRegexp("zenpou"),
-	get kouhouFilter() this._kouhouFilter || this.createFilterRegexp("kouhou"),
-	get bubunFilter() this._bubunFilter || this.createFilterRegexp("bubun"),
-	get seikiFilter() this._seikiFilter || this.createFilterRegexp("seiki"),
-	get whiteFilter() this._whiteFilter || this.createFilterRegexp("white"),
-	//set allRegExpFilter(val) this._allRegExpFilter = val,
-	set kanzenFilter(val) this._kanzenFilter = val,
-	set zenpouFilter(val) this._zenpouFilter = val,
-	set kouhouFilter(val) this._kouhouFilter = val,
-	set bubunFilter(val) this._bubunFilter = val,
-	set seikiFilter(val) this._seikiFilter = val,
-	set whiteFilter(val) this._whiteFilter = val,
-*/
-
 	getFocusedWindow: function(){
 		var win = document.commandDispatcher.focusedWindow;
 		return (!win || win == window) ? window.content : win;
@@ -618,9 +591,12 @@ window.gURLFilter = {
 //			for each(let obj in this.kanzen)
 //				if (obj.match(url) && obj.matchDoller(pageHost, isThird, isImage))
 //					return obj;
-		var knzn = this.kanzen[url];
-		if (knzn && knzn.matchDoller(pageHost, isThird, isImage))
-			return knzn
+		if (type === "kanzen") {
+			let obj = this.kanzen[url];
+			if (obj && obj.match(url) && obj.matchDoller(pageHost, isThird, isImage)){
+				return obj;
+			}
+		}
 
 		if (type === "zenpou")
 			for each(let obj in this.zenpou)
