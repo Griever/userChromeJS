@@ -3,8 +3,10 @@
 // @namespace      http://d.hatena.ne.jp/Griever/
 // @description    loading next page and inserting into current page.
 // @include        main
-// @compatibility  Firefox 5.0
-// @version        0.2.8
+// @compatibility  Firefox 17
+// @charset        UTF-8
+// @version        0.2.9
+// @note           0.2.9 remove E4X
 // @note           0.2.8 履歴に入れる機能を廃止
 // @note           0.2.7 Firefox 14 でとりあえず動くように修正
 // @note           0.2.6 組み込みの SITEINFO を修正
@@ -157,7 +159,7 @@ var ns = window.uAutoPagerize = {
 				/./;
 			INCLUDE = arr;
 		} catch (e) {
-			log(U("INCLUDE が不正です"));
+			log("INCLUDE が不正です");
 		}
 		return arr;
 	},
@@ -169,7 +171,7 @@ var ns = window.uAutoPagerize = {
 				/^$/;
 			EXCLUDE = arr;
 		} catch (e) {
-			log(U("EXCLUDE が不正です"));
+			log("EXCLUDE が不正です");
 		}
 		return arr;
 	},
@@ -208,57 +210,65 @@ var ns = window.uAutoPagerize = {
 	init: function() {
 		ns.style = addStyle(css);
 /*
-		ns.icon = $('status-bar').appendChild($E(
-			<statusbarpanel id="uAutoPagerize-icon"
-			                class="statusbarpanel-iconic-text"
-			                state="disable"
-			                tooltiptext="disable"
-			                onclick="if(event.button != 2) uAutoPagerize.iconClick(event);"
-			                context=""/>
-		));
+		ns.icon = $('status-bar').appendChild($C("statusbarpanel", {
+			id: "uAutoPagerize-icon",
+			class: "statusbarpanel-iconic-text",
+			state: "disable",
+			tooltiptext: "disable",
+			onclick: "if (event.button != 2) uAutoPagerize.iconClick(event);",
+			context: "uAutoPagerize-popup",
+		}));
 */
-		ns.icon = $('urlbar-icons').appendChild($E(
-			<image id="uAutoPagerize-icon"
-			       state="disable"
-			       tooltiptext="disable"
-			       onclick="if(event.button != 2) uAutoPagerize.iconClick(event);"
-			       context="uAutoPagerize-popup" />
-		));
-		ns.icon.style.padding = "0px 2px";
+		ns.icon = $('urlbar-icons').appendChild($C("image", {
+			id: "uAutoPagerize-icon",
+			state: "disable",
+			tooltiptext: "disable",
+			onclick: "if (event.button != 2) uAutoPagerize.iconClick(event);",
+			context: "uAutoPagerize-popup",
+			style: "padding: 0px 2px;",
+		}));
 
-		ns.popup = $('mainPopupSet').appendChild($E(
-			<menupopup id="uAutoPagerize-popup">
-				<menuitem label={U("ON/OFF 切り替え")}
-				          oncommand="uAutoPagerize.toggle(event);"/>
-				<menuitem label={U("設定ファイルの再読み込み")}
-				          oncommand="uAutoPagerize.loadSetting(true);" />
-				<menuitem label={U("SITEINFO の更新")}
-				          oncommand="uAutoPagerize.resetSITEINFO();" />
-				<menuseparator />
-				<menuitem label={U("継ぎ足したページのリンクは新しいタブで開く")}
-				          id="uAutoPagerize-FORCE_TARGET_WINDOW"
-				          type="checkbox"
-				          autoCheck="false"
-				          checked={FORCE_TARGET_WINDOW}
-				          oncommand="uAutoPagerize.FORCE_TARGET_WINDOW = !uAutoPagerize.FORCE_TARGET_WINDOW;" />
-				<menuitem label={U("先読みの開始位置")}
-				          id="uAutoPagerize-BASE_REMAIN_HEIGHT"
-				          tooltiptext={BASE_REMAIN_HEIGHT}
-				          oncommand="uAutoPagerize.BASE_REMAIN_HEIGHT = prompt('', uAutoPagerize.BASE_REMAIN_HEIGHT);" />
-				<menuitem label={U("スクロールするまで次のページを読み込まない")}
-				          id="uAutoPagerize-SCROLL_ONLY"
-				          type="checkbox"
-				          autoCheck="false"
-				          checked={SCROLL_ONLY}
-				          oncommand="uAutoPagerize.SCROLL_ONLY = !uAutoPagerize.SCROLL_ONLY;" />
-				<menuitem label={U("デバッグモード")}
-				          id="uAutoPagerize-DEBUG"
-				          type="checkbox"
-				          autoCheck="false"
-				          checked={DEBUG}
-				          oncommand="uAutoPagerize.DEBUG = !uAutoPagerize.DEBUG;" />
-			</menupopup>
-		));
+		var xml = '\
+			<menupopup id="uAutoPagerize-popup"\
+			           position="after_start"\
+			           onpopupshowing="if (this.triggerNode) this.triggerNode.setAttribute(\'open\', \'true\');"\
+			           onpopuphiding="if (this.triggerNode) this.triggerNode.removeAttribute(\'open\');">\
+				<menuitem label="ON/OFF の切り替え"\
+				          oncommand="uAutoPagerize.toggle(event);"/>\
+				<menuitem label="設定ファイルの再読み込み"\
+				          oncommand="uAutoPagerize.loadSetting(true);"/>\
+				<menuitem label="SITEINFO の更新"\
+				          oncommand="uAutoPagerize.resetSITEINFO();"/>\
+				<menuseparator/>\
+				<menuitem label="継ぎ足したページのリンクは新しいタブで開く"\
+				          id="uAutoPagerize-FORCE_TARGET_WINDOW"\
+				          type="checkbox"\
+				          autoCheck="false"\
+				          checked="true"\
+				          oncommand="uAutoPagerize.FORCE_TARGET_WINDOW = !uAutoPagerize.FORCE_TARGET_WINDOW;"/>\
+				<menuitem label="先読みの開始位置"\
+				          id="uAutoPagerize-BASE_REMAIN_HEIGHT"\
+				          tooltiptext="400"\
+				          oncommand="uAutoPagerize.BASE_REMAIN_HEIGHT = prompt(\'\', uAutoPagerize.BASE_REMAIN_HEIGHT);"/>\
+				<menuitem label="スクロールするまで次のページを読み込まない"\
+				          id="uAutoPagerize-SCROLL_ONLY"\
+				          type="checkbox"\
+				          autoCheck="false"\
+				          checked="false"\
+				          oncommand="uAutoPagerize.SCROLL_ONLY = !uAutoPagerize.SCROLL_ONLY;"/>\
+				<menuitem label="デバッグモード"\
+				          id="uAutoPagerize-DEBUG"\
+				          type="checkbox"\
+				          autoCheck="false"\
+				          checked="false"\
+				          oncommand="uAutoPagerize.DEBUG = !uAutoPagerize.DEBUG;"/>\
+			</menupopup>\
+		';
+		var range = document.createRange();
+		range.selectNodeContents($('mainPopupSet'));
+		range.collapse(false);
+		range.insertNode(range.createContextualFragment(xml.replace(/\n|\t/g, '')));
+		range.detach();
 
 		["DEBUG", "AUTO_START", "FORCE_TARGET_WINDOW", "SCROLL_ONLY"].forEach(function(name) {
 			try {
@@ -356,7 +366,7 @@ var ns = window.uAutoPagerize = {
 			ns.EXCLUDE = sandbox.EXCLUDE;
 		if (isAlert)
 			Cc['@mozilla.org/alerts-service;1'].getService(Ci.nsIAlertsService)
-				.showAlertNotification(null, 'uAutoPagerize', U('設定ファイルを読み込みました'), false, "", null, "");
+				.showAlertNotification(null, 'uAutoPagerize', '設定ファイルを読み込みました', false, "", null, "");
 		return true;
 	},
 	getFocusedWindow: function() {
@@ -407,7 +417,7 @@ var ns = window.uAutoPagerize = {
 		});
 
 		var index = -1, info;
-		if (/^http\:\/\/\w+\.google\.(co\.jp|com)/.test(locationHref)) {
+		if (/\bgoogle\.(?:com|co\.jp)$/.test(win.location.host)) {
 			if (!timer || timer < 400) timer = 400;
 			win.addEventListener("hashchange", function(event) {
 				if (!win.ap) {
@@ -427,8 +437,7 @@ var ns = window.uAutoPagerize = {
 					updateIcon();
 				}, timer);
 			}, false);
-		}
-		if (/google\.(?:com|co\.jp)$/.test(win.location.host)) {
+
 			// Google Video
 			var js = '';
 			var df = function (newDoc) {
@@ -811,13 +820,13 @@ AutoPager.prototype = {
 		var [reqScheme,,reqHost] = this.requestURL.split('/');
 		var {protocol, host} = this.win.location;
 		if (reqScheme !== protocol) {
-			log(U(protocol + " が " + reqScheme + "にリクエストを送ることはできません"));
+			log(protocol + " が " + reqScheme + "にリクエストを送ることはできません");
 			this.state = "error";
 			return;
 		}
 		var isSameDomain = reqHost == host;
 		if (!isSameDomain && !this.isThridParty(host, reqHost)) {
-			log(U(host + " が " + reqHost + "にリクエストを送ることはできません"));
+			log(host + " が " + reqHost + "にリクエストを送ることはできません");
 			this.state = 'error';
 			return;
 		}
@@ -843,7 +852,7 @@ AutoPager.prototype = {
 		var before = res.URI.host;
 		var after  = res.originalURI.host;
 		if (before != after && !this.isThridParty(before, after)) {
-			log(U(before + " が " + after + "にリダイレクトされました"));
+			log(before + " が " + after + "にリダイレクトされました");
 			this.state = 'error';
 			return;
 		}
@@ -1337,22 +1346,11 @@ function log(){ Application.console.log('[uAutoPagerize] ' + $A(arguments)); }
 function debug(){ if (ns.DEBUG) Application.console.log('[uAutoPagerize DEBUG] ' + $A(arguments)); };
 function $(id, doc) (doc || document).getElementById(id);
 
-// http://gist.github.com/321205
-function U(text) 1 < 'あ'.length ? decodeURIComponent(escape(text)) : text;
 function $A(arr) Array.slice(arr);
-function $E(xml, doc) {
-	doc = doc || document;
-	xml = <root xmlns={doc.documentElement.namespaceURI}/>.appendChild(xml);
-	var settings = XML.settings();
-	XML.prettyPrinting = false;
-	var root = new DOMParser().parseFromString(xml.toXMLString(), 'application/xml').documentElement;
-	XML.setSettings(settings);
-	doc.adoptNode(root);
-	var range = doc.createRange();
-	range.selectNodeContents(root);
-	var frag = range.extractContents();
-	range.detach();
-	return frag.childNodes.length < 2 ? frag.firstChild : frag;
+function $C(name, attr) {
+	var el = document.createElement(name);
+	if (attr) Object.keys(attr).forEach(function(n) el.setAttribute(n, attr[n]));
+	return el;
 }
 
 function addStyle(css) {
@@ -1395,42 +1393,37 @@ function saveFile(name, data) {
 	foStream.close();
 };
 
-})(<![CDATA[
-
-#uAutoPagerize-icon {
-	list-style-image: url(
-		data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAAAQCAYAAACBSfjBAAAA2klEQVRYhe
-		2WwYmGMBhE390+0kCOwZLswQK82YAg2Ict2IBdeJ3/FHcW9oewnoRv4N0yGB4TECLPs22bHIBlWeQAzP
-		Msp/a7q5MDkM4kB6DsRc7PDaTfQEqnHIBSdjm1fXWXHIAznXIA9rLLub+esxyA4zjkfDsXAkNgCHy/wM
-		jDtK5tHEc5td+6tn7t5dz9xrX1/Sqn9lvXtvarnNpvXdtfLzUEhsAQ+H6BkYdpXdswDHJqv3Vtecpy7n
-		7j2nKe5NR+69qmPMmp/da1ff2NCYEhMAS+WmDk//kA2XH2W9CWRjQAAAAASUVORK5CYII=
-		);
-	-moz-image-region: rect(0px 16px 16px 0px );
-}
-
-#uAutoPagerize-icon[state="enable"]     { -moz-image-region: rect(0px 32px 16px 16px); }
-#uAutoPagerize-icon[state="terminated"] { -moz-image-region: rect(0px 48px 16px 32px); }
-#uAutoPagerize-icon[state="error"]      { -moz-image-region: rect(0px 64px 16px 48px); }
-#uAutoPagerize-icon[state="off"]        { -moz-image-region: rect(0px 80px 16px 64px); }
-
-
-#uAutoPagerize-icon[state="loading"] {
-	list-style-image: url(data:image/gif;base64,
-		R0lGODlhEAAQAKEDADC/vyHZ2QD//////yH/C05FVFNDQVBFMi4wAwEAAAAh+QQJCgADACwAAAAAEAAQ
-		AAACIJyPacKi2txDcdJmsw086NF5WviR32kAKvCtrOa2K3oWACH5BAkKAAMALAAAAAAQABAAAAIinI9p
-		wTEChRrNRanqi1PfCYLACIQHWZoDqq5kC8fyTNdGAQAh+QQJCgADACwAAAAAEAAQAAACIpyPacAwAcMQ
-		VKz24qyXZbhRnRNJlaWk6sq27gvH8kzXQwEAIfkECQoAAwAsAAAAABAAEAAAAiKcj6kDDRNiWO7JqSqU
-		1O24hCIilMJomCeqokPrxvJM12IBACH5BAkKAAMALAAAAAAQABAAAAIgnI+pCg2b3INH0uquXqGH7X1a
-		CHrbeQiqsK2s5rYrehQAIfkECQoAAwAsAAAAABAAEAAAAiGcj6nL7Q+jNKACaO/L2E4mhMIQlMEijuap
-		pKSJim/5DQUAIfkECQoAAwAsAAAAABAAEAAAAiKcj6nL7Q+jnLRaJbIYoYcBhIChbd4njkPJeaBIam33
-		hlUBACH5BAEKAAMALAAAAAAQABAAAAIgnI+py+0PoxJUwGofvlXKAAYDQAJLKJamgo7lGbqktxQAOw==
-		);
-}
-
-#uAutoPagerize-icon > .statusbarpanel-text {
-	display: none !important;
-}
-
-]]>.toString().replace(/\n|\t/g, ''));
+})('\
+#uAutoPagerize-icon {\
+	list-style-image: url(\
+		data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAAAQCAYAAACBSfjBAAAA2klEQVRYhe\
+		2WwYmGMBhE390+0kCOwZLswQK82YAg2Ict2IBdeJ3/FHcW9oewnoRv4N0yGB4TECLPs22bHIBlWeQAzP\
+		Msp/a7q5MDkM4kB6DsRc7PDaTfQEqnHIBSdjm1fXWXHIAznXIA9rLLub+esxyA4zjkfDsXAkNgCHy/wM\
+		jDtK5tHEc5td+6tn7t5dz9xrX1/Sqn9lvXtvarnNpvXdtfLzUEhsAQ+H6BkYdpXdswDHJqv3Vtecpy7n\
+		7j2nKe5NR+69qmPMmp/da1ff2NCYEhMAS+WmDk//kA2XH2W9CWRjQAAAAASUVORK5CYII=\
+		);\
+	-moz-image-region: rect(0px 16px 16px 0px );\
+}\
+\
+#uAutoPagerize-icon[state="enable"]     { -moz-image-region: rect(0px 32px 16px 16px); }\
+#uAutoPagerize-icon[state="terminated"] { -moz-image-region: rect(0px 48px 16px 32px); }\
+#uAutoPagerize-icon[state="error"]      { -moz-image-region: rect(0px 64px 16px 48px); }\
+#uAutoPagerize-icon[state="off"]        { -moz-image-region: rect(0px 80px 16px 64px); }\
+\
+\
+#uAutoPagerize-icon[state="loading"] {\
+	list-style-image: url(data:image/gif;base64,\
+		R0lGODlhEAAQAKEDADC/vyHZ2QD//////yH/C05FVFNDQVBFMi4wAwEAAAAh+QQJCgADACwAAAAAEAAQ\
+		AAACIJyPacKi2txDcdJmsw086NF5WviR32kAKvCtrOa2K3oWACH5BAkKAAMALAAAAAAQABAAAAIinI9p\
+		wTEChRrNRanqi1PfCYLACIQHWZoDqq5kC8fyTNdGAQAh+QQJCgADACwAAAAAEAAQAAACIpyPacAwAcMQ\
+		VKz24qyXZbhRnRNJlaWk6sq27gvH8kzXQwEAIfkECQoAAwAsAAAAABAAEAAAAiKcj6kDDRNiWO7JqSqU\
+		1O24hCIilMJomCeqokPrxvJM12IBACH5BAkKAAMALAAAAAAQABAAAAIgnI+pCg2b3INH0uquXqGH7X1a\
+		CHrbeQiqsK2s5rYrehQAIfkECQoAAwAsAAAAABAAEAAAAiGcj6nL7Q+jNKACaO/L2E4mhMIQlMEijuap\
+		pKSJim/5DQUAIfkECQoAAwAsAAAAABAAEAAAAiKcj6nL7Q+jnLRaJbIYoYcBhIChbd4njkPJeaBIam33\
+		hlUBACH5BAEKAAMALAAAAAAQABAAAAIgnI+py+0PoxJUwGofvlXKAAYDQAJLKJamgo7lGbqktxQAOw==\
+		);\
+}\
+\
+'.replace(/\n|\t/g, ''));
 
 window.uAutoPagerize.init();

@@ -7,8 +7,8 @@
 // @license        MIT License
 // @compatibility  Firefox 5
 // @charset        UTF-8
-// @version        0.0.4
-// @note           0.0.4 アイコン用の CSS を追加
+// @version        0.0.5
+// @note           0.0.5 Remove E4X
 // @note           0.0.4 設定ファイルから CSS を追加できるようにした
 // @note           0.0.4 label の無い menu を splitmenu 風の動作にした
 // @note           0.0.4 Vista でアイコンがズレる問題を修正…したかも
@@ -177,20 +177,24 @@ window.addMenu = {
 
 		var ins;
 		ins = $("context-viewinfo");
-		ins.parentNode.insertBefore($E(<menuseparator id="addMenu-page-insertpoint" class="addMenu-insert-point" />), ins.nextSibling);
+		ins.parentNode.insertBefore(
+			$C("menuseparator", { id: "addMenu-page-insertpoint", class: "addMenu-insert-point" }), ins.nextSibling);
 		ins = $("context_closeTab");
-		ins.parentNode.insertBefore($E(<menuseparator id="addMenu-tab-insertpoint" class="addMenu-insert-point" />), ins.nextSibling);
+		ins.parentNode.insertBefore(
+			$C("menuseparator", { id: "addMenu-tab-insertpoint", class: "addMenu-insert-point" }), ins.nextSibling);
 		ins = $("prefSep");
-		ins.parentNode.insertBefore($E(<menuseparator id="addMenu-tool-insertpoint" class="addMenu-insert-point" />), ins.nextSibling);
+		ins.parentNode.insertBefore(
+			$C("menuseparator", { id: "addMenu-tool-insertpoint", class: "addMenu-insert-point" }), ins.nextSibling);
 		ins = $("appmenu-quit");
-		ins.parentNode.insertBefore($E(<menuseparator id="addMenu-app-insertpoint" class="addMenu-insert-point" />), ins);
+		ins.parentNode.insertBefore(
+			$C("menuseparator", { id: "addMenu-app-insertpoint", class: "addMenu-insert-point" }), ins.nextSibling);
 		ins = $("devToolsSeparator");
-		ins.parentNode.insertBefore($E(
-			<menuitem id="addMenu-rebuild"
-			          label={U("addMenu の再読み込み")}
-			          oncommand="setTimeout(function(){ addMenu.rebuild(true); }, 10);"
-			          onclick="if (event.button == 2) { event.preventDefault(); addMenu.edit(addMenu.FILE); }" />
-		), ins);
+		ins.parentNode.insertBefore($C("menuitem", {
+			id: "addMenu-rebuild",
+			label: "addMenu の再読み込み",
+			oncommand: "setTimeout(function(){ addMenu.rebuild(true); }, 10);",
+			onclick: "if (event.button == 2) { event.preventDefault(); addMenu.edit(addMenu.FILE); }",
+		}), ins);
 
 		$("contentAreaContextMenu").addEventListener("popupshowing", this, false);
 		this.style = addStyle(css);
@@ -300,19 +304,12 @@ window.addMenu = {
 		sandbox.Cu = Cu;
 		sandbox.Services = Services;
 		sandbox.locale = Services.prefs.getCharPref("general.useragent.locale");
-		sandbox.include = function(aLeafName) {
-			try {
-				let aFile = addMenu.FILE.parent;
-				aFile.QueryInterface(Ci.nsILocalFile);
-				aFile.appendRelativePath(aLeafName);
-				if (!aFile.exists() || !aFile.isFile())
-					throw U(aLeafName + " が見つかりません");
 
-				let fileURL = Services.io.getProtocolHandler("file").QueryInterface(Ci.nsIFileProtocolHandler).getURLSpecFromFile(aFile);
-				return Services.scriptloader.loadSubScript(fileURL + "?" + new Date().getTime(), sandbox, "UTF-8");
-			} catch (e) {
-				Cu.reportError(e);
-			}
+		var includeSrc = "";
+		sandbox.include = function(aLeafName) {
+			var data = loadFile(aLeafName);
+			if (data)
+				includeSrc += data + "\n";
 		};
 		sandbox._css = [];
 
@@ -338,6 +335,7 @@ window.addMenu = {
 
 		try {
 			Cu.evalInSandbox("function css(code){ this._css.push(code+'') };\n" + data, sandbox, "1.8");
+			Cu.evalInSandbox(includeSrc, sandbox, "1.8");
 		} catch (e) {
 			return this.log(e);
 		}
@@ -389,17 +387,17 @@ window.addMenu = {
 					if (!menu.hasAttribute(n) && firstItem.hasAttribute(n))
 						menu.setAttribute(n, firstItem.getAttribute(n));
 				}, this);
-				menu.setAttribute('onclick', <![CDATA[
-					if (event.target != event.currentTarget) return;
-					var firstItem = event.currentTarget.querySelector('menuitem');
-					if (!firstItem) return;
-					if (event.button === 1) {
-						checkForMiddleClick(firstItem, event);
-					} else {
-						firstItem.doCommand();
-						closeMenus(event.currentTarget);
-					}
-				]]>.toString());
+				menu.setAttribute('onclick', "\
+					if (event.target != event.currentTarget) return;\
+					var firstItem = event.currentTarget.querySelector('menuitem');\
+					if (!firstItem) return;\
+					if (event.button === 1) {\
+						checkForMiddleClick(firstItem, event);\
+					} else {\
+						firstItem.doCommand();\
+						closeMenus(event.currentTarget);\
+					}\
+				");
 			}
 		}
 		return menu;
@@ -696,19 +694,10 @@ function $$(exp, doc) { return Array.prototype.slice.call((doc || document).quer
 function $A(args) { return Array.prototype.slice.call(args); }
 function log() { Application.console.log(Array.slice(arguments)); }
 function U(text) 1 < 'あ'.length ? decodeURIComponent(escape(text)) : text;
-function $E(xml, doc) {
-	doc = doc || document;
-	xml = <root xmlns={doc.documentElement.namespaceURI}/>.appendChild(xml);
-	var settings = XML.settings();
-	XML.prettyPrinting = false;
-	var root = new DOMParser().parseFromString(xml.toXMLString(), 'application/xml').documentElement;
-	XML.setSettings(settings);
-	doc.adoptNode(root);
-	var range = doc.createRange();
-	range.selectNodeContents(root);
-	var frag = range.extractContents();
-	range.detach();
-	return frag.childNodes.length < 2 ? frag.firstChild : frag;
+function $C(name, attr) {
+	var el = document.createElement(name);
+	if (attr) Object.keys(attr).forEach(function(n) el.setAttribute(n, attr[n]));
+	return el;
 }
 function addStyle(css) {
 	var pi = document.createProcessingInstruction(
@@ -730,295 +719,68 @@ function loadText(aFile) {
 	fstream.close();
 	return data;
 }
-
-
-})(<![CDATA[
-#contentAreaContextMenu:not([addMenu~="select"]) .addMenu[condition~="select"],
-#contentAreaContextMenu:not([addMenu~="link"])   .addMenu[condition~="link"],
-#contentAreaContextMenu:not([addMenu~="mailto"]) .addMenu[condition~="mailto"],
-#contentAreaContextMenu:not([addMenu~="image"])  .addMenu[condition~="image"],
-#contentAreaContextMenu:not([addMenu~="canvas"])  .addMenu[condition~="canvas"],
-#contentAreaContextMenu:not([addMenu~="media"])  .addMenu[condition~="media"],
-#contentAreaContextMenu:not([addMenu~="input"])  .addMenu[condition~="input"],
-#contentAreaContextMenu[addMenu~="select"] .addMenu[condition~="noselect"],
-#contentAreaContextMenu[addMenu~="link"]   .addMenu[condition~="nolink"],
-#contentAreaContextMenu[addMenu~="mailto"] .addMenu[condition~="nomailto"],
-#contentAreaContextMenu[addMenu~="image"]  .addMenu[condition~="noimage"],
-#contentAreaContextMenu[addMenu~="canvas"]  .addMenu[condition~="nocanvas"],
-#contentAreaContextMenu[addMenu~="media"]  .addMenu[condition~="nomedia"],
-#contentAreaContextMenu[addMenu~="input"]  .addMenu[condition~="noinput"],
-#contentAreaContextMenu:not([addMenu=""])  .addMenu[condition~="normal"]
-  { display: none; }
-
-.addMenu-insert-point
-  { display: none !important; }
-
-
-.addMenu[url] {
-  list-style-image: url("chrome://mozapps/skin/places/defaultFavicon.png");
-}
-
-.addMenu.exec,
-.addMenu[exec] {
-  list-style-image: url("chrome://browser/skin/aboutSessionRestore-window-icon.png");
-}
-
-.addMenu.copy,
-menuitem.addMenu[text]:not([url]):not([keyword]):not([exec])
-{
-  list-style-image: url("chrome://browser/skin/appmenu-icons.png");
-  -moz-image-region: rect(0pt, 32px, 16px, 16px);
-}
-
-.addMenu.checkbox .menu-iconic-icon {
-  -moz-appearance: checkbox;
-}
-
-.addMenu > .menu-iconic-left {
-  -moz-appearance: menuimage;
+function loadFile(aLeafName) {
+	var aFile = Cc["@mozilla.org/file/directory_service;1"]
+		.getService(Ci.nsIDirectoryService)
+		.QueryInterface(Ci.nsIProperties)
+		.get('UChrm', Ci.nsILocalFile);
+	aFile.appendRelativePath(aLeafName);
+	if (!aFile.exists() || !aFile.isFile()) return null;
+	var fstream = Cc["@mozilla.org/network/file-input-stream;1"].createInstance(Ci.nsIFileInputStream);
+	var sstream = Cc["@mozilla.org/scriptableinputstream;1"].createInstance(Ci.nsIScriptableInputStream);
+	fstream.init(aFile, -1, 0, 0);
+	sstream.init(fstream);
+	var data = sstream.read(sstream.available());
+	try { data = decodeURIComponent(escape(data)); } catch(e) {}
+	sstream.close();
+	fstream.close();
+	return data;
 }
 
 
-.addMenu:-moz-any([icon="back"], [command="context-back"], [command^="Browser:Back"]) {
-	list-style-image: url("chrome://browser/skin/Toolbar.png");
-	-moz-image-region: rect(0, 18px, 18px, 0);
-}
-.addMenu:-moz-any([icon="forward"], [command="context-forward"], [command^="Browser:Forward"]) {
-	list-style-image: url("chrome://browser/skin/Toolbar.png");
-	-moz-image-region: rect(0, 36px, 18px, 18px);
-}
-.addMenu:-moz-any([icon="stop"], [command="context-stop"], [command="Browser:Stop"]) {
-	list-style-image: url("chrome://browser/skin/Toolbar.png");
-	-moz-image-region: rect(0, 54px, 18px, 36px);
-}
-.addMenu:-moz-any([icon="reload"], [command="context-reload"], [command^="Browser:Reload"]) {
-	list-style-image: url("chrome://browser/skin/Toolbar.png");
-	-moz-image-region: rect(0, 72px, 18px, 54px);
-}
-.addMenu:-moz-any([icon="home"], [command="Browser:Home"]) {
-	list-style-image: url("chrome://browser/skin/Toolbar.png");
-	-moz-image-region: rect(0, 90px, 18px, 72px);
-}
-.addMenu:-moz-any([icon="download"]) {
-	list-style-image: url("chrome://browser/skin/Toolbar.png");
-	-moz-image-region: rect(0, 108px, 18px, 90px);
-}
-.addMenu:-moz-any([icon="history"]) {
-	list-style-image: url("chrome://browser/skin/Toolbar.png");
-	-moz-image-region: rect(0, 126px, 18px, 108px);
-}
-.addMenu:-moz-any([icon="bookmark"]) {
-	list-style-image: url("chrome://browser/skin/Toolbar.png");
-	-moz-image-region: rect(0, 144px, 18px, 126px);
-}
-.addMenu:-moz-any([icon="print"]) {
-	list-style-image: url("chrome://browser/skin/Toolbar.png");
-	-moz-image-region: rect(0, 162px, 18px, 144px);
-}
-.addMenu:-moz-any([icon="newtab"], [command="context-openlinkintab"]) {
-	list-style-image: url("chrome://browser/skin/Toolbar.png");
-	-moz-image-region: rect(0, 180px, 18px, 162px);
-}
-.addMenu:-moz-any([icon="newwindow"], [command="context-openlink"]) {
-	list-style-image: url("chrome://browser/skin/Toolbar.png");
-	-moz-image-region: rect(0, 198px, 18px, 180px);
-}
-.addMenu:-moz-any([icon="copy"]) {
-	list-style-image: url("chrome://browser/skin/Toolbar.png");
-	-moz-image-region: rect(0, 234px, 18px, 216px);
-}
-.addMenu:-moz-any([icon="paste"]) {
-	list-style-image: url("chrome://browser/skin/Toolbar.png");
-	-moz-image-region: rect(0, 252px, 18px, 234px);
-}
-.addMenu:-moz-any([icon="fullscreen"]) {
-	list-style-image: url("chrome://browser/skin/Toolbar.png");
-	-moz-image-region: rect(0, 270px, 18px, 252px);
-}
-.addMenu:-moz-any([icon="zoomout"], [icon="plus"]) {
-	list-style-image: url("chrome://browser/skin/Toolbar.png");
-	-moz-image-region: rect(0, 288px, 18px, 270px);
-}
-.addMenu:-moz-any([icon="zoomin"], [icon="minus"]) {
-	list-style-image: url("chrome://browser/skin/Toolbar.png");
-	-moz-image-region: rect(0, 306px, 18px, 288px);
-}
-.addMenu:-moz-any([icon="sync"]) {
-	list-style-image: url("chrome://browser/skin/Toolbar.png");
-	-moz-image-region: rect(0, 324px, 18px, 306px);
-}
-.addMenu:-moz-any([icon="feed"]) {
-	list-style-image: url("chrome://browser/skin/Toolbar.png");
-	-moz-image-region: rect(0, 342px, 18px, 324px);
-}
-
-
-.addMenu:-moz-any([icon="star"], [command^="context-bookmark"]) {
-	list-style-image: url("chrome://browser/skin/places/editBookmark.png");
-	-moz-image-region: rect(0px, 16px, 16px, 0px);
-}
-.addMenu:-moz-any([icon="feed2"]) {
-	list-style-image: url("chrome://browser/skin/feeds/feedIcon16.png");
-}
-.addMenu:-moz-any([icon="search"], [command="context-searchselect"]) {
-	list-style-image: url("chrome://global/skin/icons/Search-glass.png");
-	-moz-image-region: rect(0px, 16px, 16px, 0px);
-}
-.addMenu:-moz-any([icon="starbutton"]) {
-	list-style-image: none;
-}
-.addMenu:-moz-any([icon="starbutton"]) > hbox > .menu-iconic-icon {
-	background: transparent no-repeat center center -moz-element(#star-button);
-}
-.addMenu:-moz-any([icon="close"]) {
-	list-style-image: url("chrome://global/skin/icons/close.png");
-	-moz-image-region: rect(0, 16px, 16px, 0);
-}
-.addMenu:-moz-any([icon="close"]):hover {
-	-moz-image-region: rect(0, 32px, 16px, 16px);
-}
-.addMenu:-moz-any([icon="close"]):hover:active {
-	-moz-image-region: rect(0, 48px, 16px, 32px);
-}
-.addMenu:-moz-any([icon="newtab2"]) {
-	list-style-image: url("chrome://browser/skin/tabbrowser/newtab.png");
-}
-.addMenu:-moz-any([icon="firefox"]) {
-	list-style-image: url("chrome://branding/content/icon16.png");
-}
-.addMenu:-moz-any([icon="url"], [command="context-openlinkincurrent"]) {
-	list-style-image: url("chrome://mozapps/skin/places/defaultFavicon.png");
-}
-.addMenu:-moz-any([icon="exec"]) {
-	list-style-image: url("chrome://browser/skin/aboutSessionRestore-window-icon.png");
-}
-.addMenu:-moz-any([icon="checkbox"]) .menu-iconic-icon {
-	-moz-appearance: checkbox;
-	display: -moz-box;
-}
-.addMenu:-moz-any([icon="cut"], [command="context-cut"]) {
-	list-style-image: url("chrome://browser/skin/appmenu-icons.png");
-	-moz-image-region: rect(0 16px 16px 0);
-}
-.addMenu:-moz-any([icon="copy2"], [command^="context-copy"]) {
-	list-style-image: url("chrome://browser/skin/appmenu-icons.png");
-	-moz-image-region: rect(0, 32px, 16px, 16px);
-}
-.addMenu:-moz-any([icon="paste2"], [command="context-paste"]) {
-	list-style-image: url("chrome://browser/skin/appmenu-icons.png");
-	-moz-image-region: rect(0 48px 16px 32px);
-}
-.addMenu:-moz-any([icon="print2"]) {
-	list-style-image: url("chrome://browser/skin/appmenu-icons.png");
-	-moz-image-region: rect(0 64px 16px 48px);
-}
-.addMenu:-moz-any([icon="quit"]) {
-	list-style-image: url("chrome://browser/skin/appmenu-icons.png");
-	-moz-image-region: rect(0 80px 16px 64px);
-}
-.addMenu:-moz-any([icon="privacy"], [command="Tools:PrivateBrowsing"]) {
-	list-style-image: url("chrome://browser/skin/Privacy-16.png");
-}
-.addMenu:-moz-any([icon="addons"], [icon="addon"]) {
-	list-style-image: url("chrome://mozapps/skin/extensions/extensionGeneric-16.png");
-}
-.addMenu:-moz-any([icon="folder"]) {
-	list-style-image: url("chrome://global/skin/icons/folder-item.png");
-	-moz-image-region: rect(0px, 32px, 16px, 16px);
-}
-.addMenu:-moz-any([icon="livemark"]) {
-	list-style-image: url("chrome://browser/skin/livemark-folder.png");
-}
-.addMenu:-moz-any([icon="query"]) {
-	list-style-image: url("chrome://browser/skin/places/query.png");
-}
-.addMenu:-moz-any([icon="calendar"]) {
-	list-style-image: url("chrome://browser/skin/places/calendar.png");
-}
-.addMenu:-moz-any([icon="menuback"]) {
-	list-style-image: url("chrome://browser/skin/menu-back.png");
-}
-.addMenu:-moz-any([icon="menuforward"]) {
-	list-style-image: url("chrome://browser/skin/menu-forward.png");
-}
-.addMenu:-moz-any([icon="tabview"]) {
-	list-style-image: url("chrome://browser/skin/tabview/tabview.png");
-	-moz-image-region: rect(0, 90px, 18px, 72px);
-}
-
-.addMenu:-moz-any([icon="minimize"]) {
-	list-style-image: url("chrome://global/skin/icons/windowControls.png");
-	-moz-image-region: rect(0, 16px, 16px, 0);
-}
-.addMenu:-moz-any([icon="minimize"]):hover {
-	-moz-image-region: rect(16px, 16px, 32px, 0);
-}
-.addMenu:-moz-any([icon="minimize"]):hover:active {
-	-moz-image-region: rect(32px, 16px, 48px, 0);
-}
-.addMenu:-moz-any([icon="restore"]) {
-	list-style-image: url("chrome://global/skin/icons/windowControls.png");
-	-moz-image-region: rect(0, 32px, 16px, 16px);
-}
-.addMenu:-moz-any([icon="restore"]):hover {
-	-moz-image-region: rect(16px, 32px, 32px, 16px);
-}
-.addMenu:-moz-any([icon="restore"]):hover:active {
-	-moz-image-region: rect(32px, 32px, 48px, 16px);
-}
-.addMenu:-moz-any([icon="quit2"]) {
-	list-style-image: url("chrome://global/skin/icons/windowControls.png");
-	-moz-image-region: rect(0, 48px, 16px, 32px);
-}
-.addMenu:-moz-any([icon="quit2"]):hover {
-	-moz-image-region: rect(16px, 48px, 32px, 32px);
-}
-.addMenu:-moz-any([icon="quit2"]):hover:active {
-	-moz-image-region: rect(32px, 48px, 48px, 32px);
-}
-
-
-.addMenu:-moz-any([icon="jpg"], [icon="jpeg"]) {
-	list-style-image: url("moz-icon://.jpg?size=16");
-}
-.addMenu:-moz-any([icon="png"]) {
-	list-style-image: url("moz-icon://.png?size=16");
-}
-.addMenu:-moz-any([icon="gif"]) {
-	list-style-image: url("moz-icon://.gif?size=16");
-}
-.addMenu:-moz-any([icon="js"], [icon="javascript"]) {
-	list-style-image: url("moz-icon://.js?size=16");
-}
-
-
-/* famfamfam */
-.addMenu:-moz-any([icon="save"], [command^="context-save"]) {
-	list-style-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAC50lEQVQ4jY2Q21MbBRhH9z+iIRurjv4XvsqlCYQFtNJYIGk7OuNDx4EO1tFpy7VJNCkVrUKhZkN1cHCaALZQB4dL7pEmoblCuptssnt8gOn41OHhPJ7z++YTxJ7AgLlH/soiyRsWSS6KUlATJdmw9MpYpBPe7gvy7kfLvNMv81avXHrvorwu2hc+EARBECySPLGVUNhKqNQaBmrDQKnrlF81OSxrFI4aKHUdVdN5WWkQz9WM5Wf5xofXw3nRPm8VRCm4sxVX+Gw2h6IZKJqOdSRE8bjBYaXBkdKk1jCoKE1S+Tr7mRqBzSLLm3ne/zhQE0QpWN6MK1zzZ6koTSpKE+tIiFxFo1htoGo6Sl0nW9aIZmvsv1BxepL8sV3CbF8yBFEKahvRV1zzZ8iWNbJlja7RMLmyxnFNp6YZlKpN4rk6+xmV3QOVIXeCeysZRPsigijJRjhS5aovQzJfJ5mvky7UKVabqJrOsapzUNBeyzsHCoMzMbyP/8XcvYBg6ZV5slvl6vcvsI6EsI2G6b4Rpu/mOv031+kZW8M2EsL6PxwTe0wHkpi75hEskszqzhEubxqnJ43Tm8blTeHypHB5kgy7kwzOxLk8HcMxFWVgYh/HZIQ7D6OYbT+fBFa2j05kT/pUTOHyphh2Jxm6m2BwJsanUzEckxEuje9xaXyXbx7s0Wr96STw+HkZpyd1SvL1+tDdBIPTMS5PR3FMRhgY3+WT2ztcvP0PN+5v03phDsEiBZA3SzjdKWoN40z0f/s3X/qeY+q8j3C+V+bR0xLD7iSqZnD99843otR1pK+f8YXnKaaOWYTzfTKLG0Wcp4GVyG9vRKnr2Mf+4vOpDUwdfgSLFDDm1wo43YkzX2AbXePKeJiWNp8hiFIgNvfnS+ZWD8/8gyt3QgzfekJLu68giPZfx8z2R4vmnqWiaF9CtD/E3L2AuesXWm0PaLX+iOnCD5g6ZzF13ONcu5+WNp9xru27Sku7f/U/n64QFJ0JfmcAAAAASUVORK5CYII=");
-}
-.addMenu:-moz-any([icon="copy3"]) {
-	list-style-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABHUlEQVQ4jZWSUYrCQBBES++xi3cQ43k80grexT8RlXznGpEgJDqZ7h6o/UnCaMasO1A/w/C6qqYB4BvACkCW0ALAHH+clapKCIGxvPfcbrc/n0CyEALbtmXTNLzdbizLkiEEOue42+16yDTAe0/nHOu65vV6HZyYGQGsOxezTmOAmdF7z8fjwbquWRQF9/s98zwngE0HSXaTxdN6J4fDgarKT7rJ4gc95Hg88tNustcpIsLT6cSpbkII7OKMAarK8/nMVDdVVQ1ORgAzo5lRVXm5XEaxnHNDnEkHZsY8z0d3IkLnHO/3+xNggfEKrwFsUtFEhG3bPgEQLUivOYB1ypmqDt8bA17PLNVNrH8BUhKRBsDyHeBdN7GWAL5+AXSfOyX5jHKEAAAAAElFTkSuQmCC");
-}
-.addMenu:-moz-any([icon="send"], [command^="context-send"]) {
-	list-style-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACV0lEQVQ4jcWT3UtTcRzGz7/jlXddFFQSYm84CCIQISS6LCHQ6I3SpvhyhC5aBRVRQuUgNMuIfDnOJm46ceS7m9N5pm5nZ7p5dnbO7/zO9/d0MS/sPvCBz+XzgefikaRjz4NXU8rT3sV8o2+O3+iJUIMcoevyDNV3TVNdZ5iudYToavsUXfFOkqc1SJdbJtxLLYpVc3dArfDIivSsbyluOyQKpgvm4h+cI3AX4AS4BBglDm3fpqpmf0y692ZeHJQ4fN9UxNMMe6bAWoYQ1wgJnZDMEVL7ArsFgZIDbGoM3r4trKYKqO0OCanRFwXjhIHZAnzfVSQyDAVL/FPUDAHLAVSdofPLFp4P56EXbXi6Q5Bu9kTAOGF+m/A1UpZsagwmAzRDIFcUYBzYzjHI/SrejufxY9lFzjgU1LWFwThhOU1Y2CH4J3Po6ItD1RkYL+/f2WNo/xTH67EclJgLJXZE4HkYBOOElQwhmmQYnM7iY1DHyyEV67sWEmkLL4ZU9E7o+BzUEFizMblxKJBDkKqbArA54Y/K8HNORzRpY2mXMLJYxLuxDN6PZTAyX8TCDiGcsNA/ncXvmA39wIanOwzp5K1RYTIXw1EdSymGDV1gIyuQyArEsgLxrMC6JhDTCCtpwuymjcEZDWrWQG3XlJAq6z8k9gybUrop8iZHweIwLI6izWEyFyZzUWIuLObCcsroBYtmVjNWVZN/XarwyEplQ//+idu/nFPNo/zMfYWffTTOzz0e59VPArzGG+DnvQF+oa3MxfYJp6Z1uHj6jj9Z4ZGV437Sf8hf1IBPDl2Qkw0AAAAASUVORK5CYII=");
-}
-.addMenu:-moz-any([icon="edit"], [command="context-viewsource"], [command="context-viewpartialsource-selection"]) {
-	list-style-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACAklEQVQ4jY2Tz2sTURSFr/4TIijoQkTBVUrWUlCDbgoK0lCLFBH8gTtrIy5cZNEWRI2LWigFpVCktFhEoWAUrRBiQdomaSI2JqaJ6USaTGYy897Le+Nx4TgYSVoPfMvzweVyiH5nHxH5iMi/AweIaDe1iY9zrkspHaUU2sE5RyQSedhJ4pdSOo1GA5ZledTrddRqNWiaBqUUiqkZZKbO48vzMJYnTmAlcqSfiGgXEfmVUmCMQQgBxhgYYzBNE7quo1KpwCzOoRwdhL76AjBLqK3OIDZ6crNFIITwYIzBtm0YhoHNz9Oort2F2JhH+e0o7MQsVH4RiclLrEUgpfRullKCcw59YwHV5B049iLs7DVsfbyO9NMBfHoc1N+MBA63CP7FKL1GNTEEh8VgrfeDFYIw1kIoPOnBlcDBPrfbXlBKzqG8NOiWL4B960U9eRvZ8dOwSkm4b20vKKXmkV64Ccd+B5YbAC/0QU8MYX0sAEP7CqVUZ0H6/RRSL0NYeXUfxfg5WLkgtpZvITvRA+tHDpzz7QXPhrsBI4/M+FlEQ3vxYSyA2L1TML9nwDnfWRC+fAwi9ggi/gDx8HHMXj2EaiGJZrPpsa2gt3sPhi8eRXTkDJamb6Cu5SGlbKGT4GenHbTBcQVeuoQQllKq45j+LgshTHe9XvYTUdd/zPkPPrdDvwBzfHXHWIsRUwAAAABJRU5ErkJggg==");
-}
-.addMenu:-moz-any([icon="info"], [command="context-viewinfo"], [command="context-viewimageinfo"]) {
-	list-style-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACtElEQVQ4ja2T20/ScRjG+Vv02gv4dlNb86K5VgwwybYO5DBNPFzgStIUK8WAMCSIQxMxDA9QpGKJSlDgz7SQCYim/nJgBm1tdQMeluXTRRuszXnRerb38vls7/M+L4Pxv1WsXcxn66NStiZKn1CF0oXKYLpQOUcfV76VHmv35h9q5uhi/JNd4VR1bxi9vgSc1Cac1CYsnjiEhjmQZk+K2TzBP9B8WhfjF6kWMqrRVbhDKZgnE5A5PuDO0DI0rlU4/BvocMZAakYyzLrhvyHsrmheUWcoqRpdhet9Ci1Dy2i0RTA4/QmDgQ00WMOQPInA+modsqdhkAp7sqC8Py8LKNLMt1Z1hzAW/IImWwyS3jCu9Sxga3cPW7t7EPcEITYHIXkcgu11HBeUEyDn+1qzgML7QdriSUDronG9dwH1PSGIu4Po863D6ltHjYn6M8ZpyBwRGCZXQErNdBZwVEZtD7/7jKa+MMTmedQ+mkWNkQIA7AMQ6QOo0r1Blc6POmMADioOUqLbzgKOtPi2n89uosEaRo2JQrVhGiL9NGKJ78js7KGyy4cKtRdX1F6IHnhhn4mD8DQ5AJFO0d0eGopnS6g1zkL0MICr2jdYjH9DZucHyu9NoVw5AaHSjRtmClp3FISnzq1AGsZbBRofBv0J1OopiDR+uIMb+PlrH/sAwh+/QiAbg0DmgulFDKU3nSA8dS7EgmpnHhHZk7ftC7B61lCp8UKomsRlxTgE7S5cahvBxbZhdNpDaLTNgMVVJAvY8twZGQwGg1k2wGeetWRaBoKwTK1A0h2AUPkSZR1jqNd7YXBFIOmjQDjtGSZHfnAbmfwePuGbUudujUI7voT+AI3+wBq6xqI40+QA4cpSTI7sYHM2j2JtPinRSVnFGprFU6RZ3LtpwpXThCuXklMthz/Tv+g3HdPOfoYYAaMAAAAASUVORK5CYII=");
-}
-.addMenu:-moz-any([icon="blank"]) {
-	list-style-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABEUlEQVQ4jZWTW27CQAxFTdfRSt0DiH0WIbFDEAGUMJN47LHp7UfDKDxSmiudv7lHskcm+s07Ec2JaPmCTyJ6oyeZi0hjZhd3xzNEBKvV6mtMsjSzS9u26LqucD6fUdc19vs93B273Q7r9fpBMiOipbsjpQRVRUoJKSXEGNE0DaqqgruDmdG2LTabzVVyK1DVQkoJzIwQAg6Hw8NI/U5mNwIzKw/MDCJSRjkej6iqCtvtdlxwz1ASQkBd1zidTv8XDCXMjBgjQgjTBO6OnDNUFcwMZp4uMLOyXBH5n8DMCjln5JwhItMF1/KQSb/wjDHB9197uOPSC0oWqtq5++gxDcuqGvvrLfkgogW9Pucr875DP1s1i/OTwNbrAAAAAElFTkSuQmCC");
-}
-.addMenu:-moz-any([icon="application"]) {
-	list-style-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABuklEQVQ4ja3T3UvTURzH8fMfOpQSkR4opIvRmmODbSJESYFRIFIkJWKS26xIKcKiMLzqiaJQsJpdBcq0tN9+z99zfu8uzjZ22+wDn9sX33PO9yh11PRlKulry9tuebFO6X6d0sI3ivNbFOY2yc9ukLv7hdGZT1y4/ZHMzfekp99SnFl3+zKVtFJKqctL22ZqdZd/bebGa6OUUqq8WKeXjkyuoZRSqrTwnV5y5spLCxTvfQUgEk0omiAS3EBwgphDL+JXM6Bx4LOz5/Gz0eTHjgPAqYnnLWB+C4DYGGKtiUTjx4IXWuiPL/x2Q/acgMZhwO6+D8CJi88sUJjbBEAbgxhDbAyR1gSi8SLBDYVmIDiecNCM2XdCAIbHn1ogP7thgSRBjOlAkTGE2h6pDTktCGBobMUCuTufO0C70jVNaAyRCEEs+LGFAAZLjy2QufXBAoDpgiRJ7L10NdAaXywwkH9ggfPT7zpPk7QQ0zVNu3GrkdYA9OdqFkhPvelpD1KjVQukspXauevrjEyucfbqK05PvODkpVWGx58wNLbCYHmZ48VHHCs8ZCC/RH+uSipbJZWt1I78Ef9L/gKBoad/Cqbu8QAAAABJRU5ErkJggg==");
-}
-.addMenu:-moz-any([icon="image"], [command="context-viewimage"]) {
-	list-style-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAB40lEQVQ4ja3Tz2vTcBjH8f1XDm8rQdxBYaAW8TRqDyVKXf1Fdbq2HgqCPy5FRcUfbZYmra2y7VC1IEzQu4dhaTKnS41tmnzz/Wb5BrH9eFCqpbUT9IHX9c1zeJ6pqf8xR5PFa+FziimIMpmOjhEZForJ5GBi+cYgcOS8+qWp633KGJjHQT0O1+NwPA7HC2CzAF0aoEMDdCiHabuYjSvOICCIMnEpw7FUDmfvS1h8mEfygYrkoxouPq7hUr6GJek5MvILHF+6jrbLIYgqGQT2RmXCPI5Ufg3lJkVV30FFo6joPiqbHE8/BHi29RUrn74hq9ZhOmMCrseRVetYNfpY3e79UVat47PjQxCV4YDjcWQKa6hqO6jqPiqah3LThdpgKDUY1PcUTxoOrhRW0LK90YDNOE7m7uLemxZuvf6I3Pomsi/fIl3bRuan26/e4cKdAlrdMRt0KcfhyxISiv5DUUNC1rCw3BxyaDE/GpiOysRyOcLpEs6UjYnC6RKMcYEO+YfAnohELMIxM59COF2aaGY+BcPyEYr9vkFEIhbxsWH2sGH2d9GDYfHhwL4T8lbbskEoB2EBHBbAYRwO5bBHBGjbLmbj6q9TnjtdvHrglLouiAoJxXa3P66QuYXizb/81cnzHYKHUEC02ZXaAAAAAElFTkSuQmCC");
-}
-.addMenu:-moz-any([icon="images"], [command="context-copyimage-contents"]) {
-	list-style-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACUElEQVQ4jYWS30tTcQDF909Fc2+OO0tjDmE1K4pELzrmnG7DMExnLyNDV/RjD1mhY/vu3g0jsojCJ9+CHqLIl3FJ6+pt3m3f+73rfkfkTg9O3arhgc/r4cPh2C5OZRd8k5ImBAi1iw0Gj3H6Ce0NZxK2drlwXf5RUJQ6M02YVQ5W5SixGvZYDXuMQysb6A5JlbYFQoBQg5nw3uxB5PHIEcO3F+CbXIEnmkfHEKm3NXOIhJpVjkjSj6X3C3jyIYFnH+/hSiyLgqLgRDOHSKhR5Zh6GsLy5/tY+XRATzgDg5nYCEbxNZ445s4DvLkxi6LBIQRkanOIhJYYR8+8gKvJOPqnUzgznkKHSCAE83CKGbhGsnCNSHCHJCw9eo3tRBJapVFgFwnVDY5ziS70z6RO1PZGc9hOJLFbsSAEJGo7PZimOuXoCJyCa2wZBjNxOfYQs+m3R9wi7zA0u4iiweEJEnwRr2Gn1CiwD6apTi1savsQgnmYVY5Y6hXyBYbnyk+82PqFl99+Iy6vQ6tweMayUIYHoB4WdI2SraJeBmUcXcE8jCpHXF7HmlrH2vf9I+LyOnYrFtyjaaxd8kHVLTj9ErX1RbLz7nF5QwhI1DFE6iXGcX4mjbCkICwpmMgUMJEpwDudwk7Jgjuyik1tH6rODwqaczioby6HaF5twTeXg1qy0BtdRZnVUCwb6A7JrQ89HLRzIAbfXK6FzoEYVN1Cp1+qO/0SPRuSaN9E9m6rQdOgm1r9L9poN6d5UGrWUDFrKDPeoI12c5oHdfr/5X/afwDntYTcCZeBqgAAAABJRU5ErkJggg==");
-}
-
-]]>.toString());
+})('\
+#contentAreaContextMenu:not([addMenu~="select"]) .addMenu[condition~="select"],\
+#contentAreaContextMenu:not([addMenu~="link"])   .addMenu[condition~="link"],\
+#contentAreaContextMenu:not([addMenu~="mailto"]) .addMenu[condition~="mailto"],\
+#contentAreaContextMenu:not([addMenu~="image"])  .addMenu[condition~="image"],\
+#contentAreaContextMenu:not([addMenu~="canvas"])  .addMenu[condition~="canvas"],\
+#contentAreaContextMenu:not([addMenu~="media"])  .addMenu[condition~="media"],\
+#contentAreaContextMenu:not([addMenu~="input"])  .addMenu[condition~="input"],\
+#contentAreaContextMenu[addMenu~="select"] .addMenu[condition~="noselect"],\
+#contentAreaContextMenu[addMenu~="link"]   .addMenu[condition~="nolink"],\
+#contentAreaContextMenu[addMenu~="mailto"] .addMenu[condition~="nomailto"],\
+#contentAreaContextMenu[addMenu~="image"]  .addMenu[condition~="noimage"],\
+#contentAreaContextMenu[addMenu~="canvas"]  .addMenu[condition~="nocanvas"],\
+#contentAreaContextMenu[addMenu~="media"]  .addMenu[condition~="nomedia"],\
+#contentAreaContextMenu[addMenu~="input"]  .addMenu[condition~="noinput"],\
+#contentAreaContextMenu:not([addMenu=""])  .addMenu[condition~="normal"]\
+  { display: none; }\
+\
+.addMenu-insert-point\
+  { display: none !important; }\
+\
+\
+.addMenu[url] {\
+  list-style-image: url("chrome://mozapps/skin/places/defaultFavicon.png");\
+}\
+\
+.addMenu.exec,\
+.addMenu[exec] {\
+  list-style-image: url("chrome://browser/skin/aboutSessionRestore-window-icon.png");\
+}\
+\
+.addMenu.copy,\
+menuitem.addMenu[text]:not([url]):not([keyword]):not([exec])\
+{\
+  list-style-image: url("chrome://browser/skin/appmenu-icons.png");\
+  -moz-image-region: rect(0pt, 32px, 16px, 16px);\
+}\
+\
+.addMenu.checkbox .menu-iconic-icon {\
+  -moz-appearance: checkbox;\
+}\
+\
+.addMenu > .menu-iconic-left {\
+  -moz-appearance: menuimage;\
+}\
+');

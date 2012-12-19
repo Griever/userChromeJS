@@ -3,7 +3,8 @@
 // @namespace      http://d.hatena.ne.jp/Griever/
 // @include        main
 // @compatibility  Firefox 4
-// @version        0.0.8
+// @version        0.0.9
+// @note           0.0.9 Remove E4X
 // @note           Firefox 4 正式版に合わせて簡素化した
 // ==/UserScript==
 // Firefox 3.6 は古い Ver. を使ってください
@@ -73,11 +74,11 @@
     return document.insertBefore(pi, document.documentElement);
   }
 
-})(<![CDATA[
-@namespace url(http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul);
-
-.statusbar-resizerpanel {
-  display: none !important;
-}
-
-]]>.toString());
+})('\
+@namespace url(http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul);\
+\
+.statusbar-resizerpanel {\
+  display: none !important;\
+}\
+\
+');

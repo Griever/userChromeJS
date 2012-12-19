@@ -1,6 +1,5 @@
 ■このスクリプトについて
 Greasemonkey の様な .user.js を読み込むスクリプトです。
-拙作の uAutoPagerize と連携することができます。
 
 ■Greasemonkey との違い
 ・管理マネージャはない
@@ -21,6 +20,7 @@ Greasemonkey の様な .user.js を読み込むスクリプトです。
 ・@run-at(Chrome)
 ・@delay(Scriptish)
 ・@bookmarklet(NinjaKit)
+・@match(Chrome)
 これ以外のメタデータは動作には関係ありません。
 
 ■対応する GM_API
@@ -46,6 +46,24 @@ Greasemonkey の様な .user.js を読み込むスクリプトです。
 ・とくになし
 
 ■更新履歴
+
+・version 0.1.8
+　@match, @unmatch に超テキトーに対応
+　　（不正なパターンでもエラーを出さないので注意）
+　.tld をテキトーに改善
+
+・version 0.1.7.1~9
+　__exposedProps__ を付けた
+　uAutoPagerize との連携をやめた
+　window.open や target="_blank" で実行されないのを修正
+　@delay 周りのバグを修正
+　require で外部ファイルの取得がうまくいかない場合があるのを修正
+　0.1.7.4 にミスがあったので修正
+　GM_xmlhttpRequest の url が相対パスが使えなかったのを修正
+　Google Reader NG Filterがとりあえず動くように修正
+　document-startが機能していなかったのを修正
+　.tld がうまく動作していなかったのを修正
+
 ・version 0.1.7
 　書きなおした
 　スクリプトを編集時に日本語のファイル名のファイルを開けなかったのを修正

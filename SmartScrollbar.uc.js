@@ -2,8 +2,10 @@
 // @name           SmartScrollbar.uc.js
 // @namespace      http://d.hatena.ne.jp/Griever/
 // @include        main
-// @version        0.0.4
-// @note           encodeURIComponent を使うように修正
+// @version        0.0.5
+// @note           0.0.5 Remove E4X
+// @note           CSS を微調整
+// @note           SmartScrollbar に改名
 // ==/UserScript==
 // thx! http://www.geocities.jp/adsldenet/past/sample.html
 
@@ -13,32 +15,32 @@
   const HIDE_SCROLLBAR = false;
 
   // 色、太さは適宜調整
-  var css = <![CDATA[
-    html|html > scrollbar[orient="vertical"] > slider > thumb
-    {
-      max-width: 3px !important;
-      min-width: 3px !important;
-    }
-
-    html|html > scrollbar[orient="horizontal"] > slider > thumb
-    {
-      max-height: 3px !important;
-      min-height: 3px !important;
-    }
-
-    html|html > scrollbar > slider > thumb
-    {
-      -moz-appearance: none !important;
-      border: none !important;
-      background-color: #0c6 !important;
-    }
-
-    html|html > scrollbar > scrollbarbutton,
-    html|html > resizer
-    {
-      display: none !important;
-    }
-  ]]>.toString();
+  var css = '\
+    html|html > scrollbar[orient="vertical"] > slider > thumb\
+    {\
+      max-width: 3px !important;\
+      min-width: 3px !important;\
+    }\
+\
+    html|html > scrollbar[orient="horizontal"] > slider > thumb\
+    {\
+      max-height: 3px !important;\
+      min-height: 3px !important;\
+    }\
+\
+    html|html > scrollbar > slider > thumb\
+    {\
+      -moz-appearance: none !important;\
+      border: none !important;\
+      background-color: #0c6 !important;\
+    }\
+\
+    html|html > scrollbar > scrollbarbutton,\
+    html|html > resizer\
+    {\
+      display: none !important;\
+    }\
+  ';
 
   if (HIDE_SCROLLBAR)
     css = 'html|html > scrollbar { visibility: collapse !important; }';

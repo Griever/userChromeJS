@@ -5,7 +5,10 @@
 // @include        main
 // @compatibility  Firefox 5.0
 // @license        MIT License
-// @version        0.1.7.9
+// @version        0.1.8.0
+// @note           0.1.8.0 Remove E4X
+// @note           0.1.8.0 @match, @unmatch に超テキトーに対応
+// @note           0.1.8.0 .tld を Scriptish を参考にテキトーに改善
 // @note           0.1.7.9 __exposedProps__ を付けた
 // @note           0.1.7.9 uAutoPagerize との連携をやめた
 // @note           0.1.7.8 window.open や target="_blank" で実行されないのを修正
@@ -96,6 +99,8 @@ USL.ScriptEntry = function (aFile) {
 	this.init.apply(this, arguments);
 };
 USL.ScriptEntry.prototype = {
+	includeRegExp: /^https?:\/\/.*/,
+	excludeRegExp: /^$/,
 	init: function(aFile) {
 		this.file = aFile;
 		this.leafName = aFile.leafName;
@@ -115,8 +120,21 @@ USL.ScriptEntry.prototype = {
 		} else if (this.run_at === "document-idle") {
 			this.delay = 0;
 		}
-		this.includeRegExp = this.metadata.include ? this.createRegExp(this.metadata.include) : /^https?:\/\/.*/;
-		this.excludeRegExp = this.metadata.exclude ? this.createRegExp(this.metadata.exclude) : /^$/;
+
+		if (this.metadata.match) {
+			this.includeRegExp = this.createRegExp(this.metadata.match, true);
+			this.includeTLD = this.isTLD(this.metadata.match);
+		} else if (this.metadata.include) {
+			this.includeRegExp = this.createRegExp(this.metadata.include);
+			this.includeTLD = this.isTLD(this.metadata.include);
+		}
+		if (this.metadata.unmatch) {
+			this.excludeRegExp = this.createRegExp(this.metadata.unmatch, true);
+			this.excludeTLD = this.isTLD(this.metadata.unmatch);
+		} else if (this.metadata.exclude) {
+			this.excludeRegExp = this.createRegExp(this.metadata.exclude);
+			this.excludeTLD = this.isTLD(this.metadata.exclude);
+		}
 
 		this.prefName = 'scriptival.' + (this.metadata.namespace || 'nonamespace/') + '/' + this.name + '.';
 		this.__defineGetter__('pref', function() {
@@ -152,22 +170,48 @@ USL.ScriptEntry.prototype = {
 			}
 		}
 	},
-	createRegExp: function(urlarray) {
+	createRegExp: function(urlarray, isMatch) {
 		let regstr = urlarray.map(function(url) {
 			url = url.replace(/([()[\]{}|+.,^$?\\])/g, "\\$1");
-			url = url.replace(/\*+/g, ".*");
-			url = url.replace(/^\.\*\:?\/\//, "https?://");
-			url = url.replace(/^\.\*/, "https?:.*");
-			url = url.replace(/^([^:]*?:\/\/[^\/\*]+)\.tld\b/,"$1\.(?:com|net|org|info|(?:(?:co|ne|or)\\.)?jp)");
+			if (isMatch) {
+				url = url.replace(/\*+|:\/\/\*\\\./g, function(str, index, full){
+					if (str === "\\^") return "(?:^|$|\\b)";
+					if (str === "://*\\.") return "://(?:[^/]+\\.)?";
+					if (str[0] === "*" && index === 0) return "(?:https?|ftp|file)";
+					if (str[0] === "*") return ".*";
+					return str;
+				});
+			} else {
+				url = url.replace(/\*+/g, ".*");
+				url = url.replace(/^\.\*\:?\/\//, "https?://");
+				url = url.replace(/^\.\*/, "https?:.*");
+			}
+			//url = url.replace(/^([^:]*?:\/\/[^\/\*]+)\.tld\b/,"$1\.(?:com|net|org|info|(?:(?:co|ne|or)\\.)?jp)");
 			//url = url.replace(/\.tld\//,"\.(?:com|net|org|info|(?:(?:co|ne|or)\\.)?jp)/");
 			return "^" + url + "$";
 		}).join('|');
 		return new RegExp(regstr);
 	},
+	isTLD: function(urlarray) {
+		return urlarray.some(function(url) /^.+?:\/{2,3}?[^\/]+\.tld\b/.test(url));
+	},
+	makeTLDURL: function(aURL) {
+		try {
+			var uri = Services.io.newURI(aURL, null, null);
+			uri.host = uri.host.slice(0, -Services.eTLD.getPublicSuffix(uri).length) + "tld";
+			return uri.spec;
+		} catch (e) {}
+		return "";
+	},
 	isURLMatching: function(url) {
-		return !this.disabled && 
-		        this.includeRegExp.test(url) &&
-		       !this.excludeRegExp.test(url);
+		if (this.disabled) return false;
+		if (this.excludeRegExp.test(url)) return false;
+		
+		var tldurl = this.excludeTLD || this.includeTLD ? this.makeTLDURL(url) : "";
+		if (this.excludeTLD && tldurl && this.excludeRegExp.test(tldurl)) return false;
+		if (this.includeRegExp.test(url)) return true;
+		if (this.includeTLD && tldurl && this.includeRegExp.test(tldurl)) return true;
+		return false;
 	},
 	getResource: function() {
 		if (!this.metadata.resource) return;
@@ -502,71 +546,76 @@ USL.init = function(){
 	USL.loadSetting();
 	USL.style = addStyle(css);
 /*
-	USL.icon = $('status-bar').appendChild($E(
-		<statusbarpanel id="UserScriptLoader-icon" 
-		                class="statusbarpanel-iconic"
-		                context="UserScriptLoader-popup" 
-		                onclick="USL.iconClick(event);" 
-		                style="text-decoration: none;"/>
-	));
+	USL.icon = $('status-bar').appendChild($C("statusbarpanel", {
+		id: "UserScriptLoader-icon",
+		class: "statusbarpanel-iconic",
+		context: "UserScriptLoader-popup",
+		onclick: "USL.iconClick(event);"
+	}));
 */
-	USL.icon = $('urlbar-icons').appendChild($E(
-		<image id="UserScriptLoader-icon" 
-		       context="UserScriptLoader-popup" 
-		       onclick="USL.iconClick(event);"/>
-	));
-	USL.icon.style.padding = '0px 2px';
-	
-	USL.popup = $('mainPopupSet').appendChild($E(
-		<menupopup id="UserScriptLoader-popup" 
-		           onpopupshowing="USL.onPopupShowing(event);"
-		           onpopuphidden="USL.onPopupHidden(event);"
-		           onclick="USL.menuClick(event);">
-			<menuseparator id="UserScriptLoader-menuseparator"/>
-			<menu label="User Script Command"
-			      id="UserScriptLoader-register-menu"
-			      accesskey="C">
-				<menupopup id="UserScriptLoader-register-popup"/>
-			</menu>
-			<menuitem label="Save Script"
-			          id="UserScriptLoader-saveMenu"
-			          accesskey="S"
-			          oncommand="USL.saveScript();"/>
-			<menu label="Menu" id="UserScriptLoader-submenu">
-				<menupopup id="UserScriptLoader-submenu-popup">
-					<menuitem label="delete pref storage"
-					          oncommand="USL.deleteStorage('pref');" />
-					<menuseparator/>
-					<menuitem label="Hide exclude script"
-					          id="UserScriptLoader-hide-exclude"
-					          accesskey="N"
-					          type="checkbox"
-					          checked={USL.HIDE_EXCLUDE}
-					          oncommand="USL.HIDE_EXCLUDE = !USL.HIDE_EXCLUDE;" />
-					<menuitem label="Open Scripts Folder"
-					          id="UserScriptLoader-openFolderMenu"
-					          accesskey="O"
-					          oncommand="USL.openFolder();" />
-					<menuitem label="Rebuild"
-					          accesskey="R"
-					          oncommand="USL.rebuild();" />
-					<menuitem label="Cache Script"
-					          id="UserScriptLoader-cache-script"
-					          accesskey="C"
-					          type="checkbox"
-					          checked={USL.CACHE_SCRIPT}
-					          oncommand="USL.CACHE_SCRIPT = !USL.CACHE_SCRIPT;" />
-					<menuitem label="DEBUG MODE"
-					          id="UserScriptLoader-debug-mode"
-					          accesskey="D"
-					          type="checkbox"
-					          checked={USL.DEBUG}
-					          oncommand="USL.DEBUG = !USL.DEBUG;" />
-				</menupopup>
-			</menu>
-		</menupopup>
-	));
+	USL.icon = $('urlbar-icons').appendChild($C("image", {
+		id: "UserScriptLoader-icon",
+		context: "UserScriptLoader-popup",
+		onclick: "USL.iconClick(event);",
+		style: "padding: 0px 2px;",
+	}));
 
+	var xml = '\
+		<menupopup id="UserScriptLoader-popup" \
+		           onpopupshowing="USL.onPopupShowing(event);"\
+		           onpopuphidden="USL.onPopupHidden(event);"\
+		           onclick="USL.menuClick(event);">\
+			<menuseparator id="UserScriptLoader-menuseparator"/>\
+			<menu label="User Script Command"\
+			      id="UserScriptLoader-register-menu"\
+			      accesskey="C">\
+				<menupopup id="UserScriptLoader-register-popup"/>\
+			</menu>\
+			<menuitem label="Save Script"\
+			          id="UserScriptLoader-saveMenu"\
+			          accesskey="S"\
+			          oncommand="USL.saveScript();"/>\
+			<menu label="Menu" id="UserScriptLoader-submenu">\
+				<menupopup id="UserScriptLoader-submenu-popup">\
+					<menuitem label="delete pref storage"\
+					          oncommand="USL.deleteStorage(\'pref\');" />\
+					<menuseparator/>\
+					<menuitem label="Hide exclude script"\
+					          id="UserScriptLoader-hide-exclude"\
+					          accesskey="N"\
+					          type="checkbox"\
+					          checked="' + USL.HIDE_EXCLUDE + '"\
+					          oncommand="USL.HIDE_EXCLUDE = !USL.HIDE_EXCLUDE;" />\
+					<menuitem label="Open Scripts Folder"\
+					          id="UserScriptLoader-openFolderMenu"\
+					          accesskey="O"\
+					          oncommand="USL.openFolder();" />\
+					<menuitem label="Rebuild"\
+					          accesskey="R"\
+					          oncommand="USL.rebuild();" />\
+					<menuitem label="Cache Script"\
+					          id="UserScriptLoader-cache-script"\
+					          accesskey="C"\
+					          type="checkbox"\
+					          checked="' + USL.CACHE_SCRIPT + '"\
+					          oncommand="USL.CACHE_SCRIPT = !USL.CACHE_SCRIPT;" />\
+					<menuitem label="DEBUG MODE"\
+					          id="UserScriptLoader-debug-mode"\
+					          accesskey="D"\
+					          type="checkbox"\
+					          checked="' + USL.DEBUG + '"\
+					          oncommand="USL.DEBUG = !USL.DEBUG;" />\
+				</menupopup>\
+			</menu>\
+		</menupopup>\
+	';
+	var range = document.createRange();
+	range.selectNodeContents($('mainPopupSet'));
+	range.collapse(false);
+	range.insertNode(range.createContextualFragment(xml.replace(/\n|\t/g, '')));
+	range.detach();
+
+	USL.popup         = $('UserScriptLoader-popup');
 	USL.menuseparator = $('UserScriptLoader-menuseparator');
 	USL.registMenu    = $('UserScriptLoader-register-menu');
 	USL.saveMenu      = $('UserScriptLoader-saveMenu');
@@ -718,13 +767,17 @@ USL.saveScript = function() {
 	fp.displayDirectory = USL.SCRIPTS_FOLDER; // nsILocalFile
 	fp.defaultExtension = "js";
 	fp.defaultString = filename;
-	var res = fp.show();
-	if (res != fp.returnOK && res != fp.returnReplace) return;
+	var callbackObj = {
+		done: function(res) {
+			if (res != fp.returnOK && res != fp.returnReplace) return;
 
-	var wbp = Cc["@mozilla.org/embedding/browser/nsWebBrowserPersist;1"].createInstance(Ci.nsIWebBrowserPersist);
-	wbp.persistFlags = wbp.PERSIST_FLAGS_AUTODETECT_APPLY_CONVERSION;
-	var uri = makeURI(win.location.href);
-	wbp.saveURI(uri, null, null, null, null, fp.file);
+			var wbp = Cc["@mozilla.org/embedding/browser/nsWebBrowserPersist;1"].createInstance(Ci.nsIWebBrowserPersist);
+			wbp.persistFlags = wbp.PERSIST_FLAGS_AUTODETECT_APPLY_CONVERSION;
+			var uri = makeURI(win.location.href);
+			wbp.saveURI(uri, null, null, null, null, fp.file);
+		}
+	}
+	fp.open(callbackObj);
 };
 
 USL.deleteStorage = function(type) {
@@ -1084,22 +1137,11 @@ window.USL = USL;
 function log(str) { Application.console.log(Array.slice(arguments)); }
 function debug() { if (USL.DEBUG) Application.console.log('[USL DEBUG] ' + Array.slice(arguments));}
 
-// http://gist.github.com/321205
 function $(id) document.getElementById(id);
-function U(text) 1 < 'あ'.length ? decodeURIComponent(escape(text)) : text;
-function $E(xml, doc) {
-	doc = doc || document;
-	xml = <root xmlns={doc.documentElement.namespaceURI}/>.appendChild(xml);
-	var settings = XML.settings();
-	XML.prettyPrinting = false;
-	var root = new DOMParser().parseFromString(xml.toXMLString(), 'application/xml').documentElement;
-	XML.setSettings(settings);
-	doc.adoptNode(root);
-	var range = doc.createRange();
-	range.selectNodeContents(root);
-	var frag = range.extractContents();
-	range.detach();
-	return frag.childNodes.length < 2 ? frag.firstChild : frag;
+function $C(name, attr) {
+	var el = document.createElement(name);
+	if (attr) Object.keys(attr).forEach(function(n) el.setAttribute(n, attr[n]));
+	return el;
 }
 
 function addStyle(css) {
@@ -1111,43 +1153,41 @@ function addStyle(css) {
 }
 
 
-})(<![CDATA[
-/* http://www.famfamfam.com/lab/icons/silk/preview.php */
-#UserScriptLoader-icon {
-	list-style-image: url(data:image/png;base64,
-		iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACOElEQVQ4ja3Q3UtTcRgH8N8f4K11
-		FaRrVGumlTXndPYiyQqkCyPoLroOCbyJSCGJUhOGUSnShVqtFpYlW/lCKiPmy5zinObZdJtn29nZ
-		cW7nnB39TapvF+WdI4W+95/n+zwPIf8zwnRFt+AyIj5VDn7CAN5ZiphDD25Mh+jIaUSGixEePAnW
-		XhTaeYCr/OdWogMZoR2Z2DPQyBNsrpqxEWiF4muG4LwK9nOhvCOOT5Y1iks3sSV0IP29CrLnAkS3
-		EalxPRR/CxJTN8Dai35kXZ+fNGQyfBs2Q7chz1dCcp9FasIAxd+E5GwtwoNl8H3QqnZuHy+tSc5f
-		RybejvTCRUiz55CaKoPsvQV5sR7ciAnBvoJLWdtjTn1aCTWARlshz52HOG1E0lkCxd+C+LdrCH7S
-		1mXHjhLd2nQ1MvxzyF4TxJlKpCYrsD6mQ3rpEUL92l+BPg1d6T1Kl98dpr43asq8OkSZ7nyeEEII
-		59DzElMHGm3DJmvGRvAxFH8TFF8T0osPIXkaIc7UI+W6i+TEHbD9VWC68hRPx4E//+BGz6QiX4tp
-		eOgUZQdO0FV7IQ3ZCqi8+ACC7TjWhkwQ3Q2IfrmCZcsxMF0HX2Q9ZzuBj9rRdVctpLn7EN33ELaZ
-		wPSoRE/nvv3/xIQQEnivgeRpBDdcg5W3BWB68s27gn/xDDdUjejAZfheqxOezrzdtRJCiNeamxPo
-		1WLFqgHzUtW8a7idZesRr9+i5r1Pc3P2jAkhhLGodXs1vwEkf3FKAtNVEwAAAABJRU5ErkJggg==
-		);
-}
-
-#UserScriptLoader-icon[state="disable"] {
-	list-style-image: url(data:image/png;base64,
-		iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACrElEQVQ4ja2QXUhTARzFb3f55kuB
-		2EOBplLJTCtrzs/pJNHEJ03orXyIHkQkFSvSSKTmB5hRKfWSVJZhWX5MvZIuiemc05zT3Obm3Ny8
-		m7rP6+7MdnoIQWF76zwe+J3z/x+C+J+yTWd02OTpsE6lgZ5MAS1Nxvo4HxYJD+bRi1gbSYRp+DyM
-		AwmGwAHytD87m+3w2drgW38Odu0pvKst2NY3g9E0wCYtglEc7w4IW2Wpdc6lEuzY2uH5lQO3Ugin
-		Ih2OCT4YbSM2p67DOJCwG/R8Wpbi89Gt8BrK4Z7PhkshgGMyBYxWBPtsGUzDqdB85kYFbp9ILrTP
-		X4PP2gbPwmW4ZjPhmEqFW1UK92INLKO5WOmJywvavi7lexhDLVhzM9xzWXBOp8MuTQKjbYT1RzFW
-		vnIrgsPjSbyN6QL46Bdwq3LhnMmGQ5aBLQkPnqXHMPRy/fqeWFbXfYZd/niK1byPYdVvo1l1x0ma
-		IAiCsIzzaZe6Aqy5FV5jC7ZXmsBoRWA0IngWH8GlrINzpgYO+T3YJ+/A2JsD9etIRtl+4t8elrFL
-		jrVviayJusAah86xqwPxrKE/jnUv1sPWfxYbVC6cilosNCThe/FRUJmHMZhNroqzyeqgb+m/cMe2
-		5GVwzT2EU3EfKlEift7mwdvXBP+CGExnOWS3uLtDWWRp4IBPsXAp62AZKYTuQxyovBDHdl8T8CQf
-		qDoC1EfAJsrAoJDUBYJnLFQBzENXoHkXs6l8GRlOCTh+/3Q39steEw5KwPEfgFVdYaH6bi50XbFQ
-		v4lq2PPFQtLoeXUDqAkHW0lgq5KA4SYHYiFpOhCw3HVape2MoVXPwkL3+5Krxx5MlET/NldFwFod
-		guWSQ6DyObsDQvLugQB1Zwwv2LCSouPVYiGppwQcv1hIGvfgv6X5zFaYeSAgAAAAAElFTkSuQmCC
-		);
-}
-
-
-]]>.toString().replace(/[\r\n\t]/g, ''));
+})('\
+/* http://www.famfamfam.com/lab/icons/silk/preview.php */\
+#UserScriptLoader-icon {\
+	list-style-image: url(data:image/png;base64,\
+		iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACOElEQVQ4ja3Q3UtTcRgH8N8f4K11\
+		FaRrVGumlTXndPYiyQqkCyPoLroOCbyJSCGJUhOGUSnShVqtFpYlW/lCKiPmy5zinObZdJtn29nZ\
+		cW7nnB39TapvF+WdI4W+95/n+zwPIf8zwnRFt+AyIj5VDn7CAN5ZiphDD25Mh+jIaUSGixEePAnW\
+		XhTaeYCr/OdWogMZoR2Z2DPQyBNsrpqxEWiF4muG4LwK9nOhvCOOT5Y1iks3sSV0IP29CrLnAkS3\
+		EalxPRR/CxJTN8Dai35kXZ+fNGQyfBs2Q7chz1dCcp9FasIAxd+E5GwtwoNl8H3QqnZuHy+tSc5f\
+		RybejvTCRUiz55CaKoPsvQV5sR7ciAnBvoJLWdtjTn1aCTWARlshz52HOG1E0lkCxd+C+LdrCH7S\
+		1mXHjhLd2nQ1MvxzyF4TxJlKpCYrsD6mQ3rpEUL92l+BPg1d6T1Kl98dpr43asq8OkSZ7nyeEEII\
+		59DzElMHGm3DJmvGRvAxFH8TFF8T0osPIXkaIc7UI+W6i+TEHbD9VWC68hRPx4E//+BGz6QiX4tp\
+		eOgUZQdO0FV7IQ3ZCqi8+ACC7TjWhkwQ3Q2IfrmCZcsxMF0HX2Q9ZzuBj9rRdVctpLn7EN33ELaZ\
+		wPSoRE/nvv3/xIQQEnivgeRpBDdcg5W3BWB68s27gn/xDDdUjejAZfheqxOezrzdtRJCiNeamxPo\
+		1WLFqgHzUtW8a7idZesRr9+i5r1Pc3P2jAkhhLGodXs1vwEkf3FKAtNVEwAAAABJRU5ErkJggg==\
+		);\
+}\
+\
+#UserScriptLoader-icon[state="disable"] {\
+	list-style-image: url(data:image/png;base64,\
+		iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACrElEQVQ4ja2QXUhTARzFb3f55kuB\
+		2EOBplLJTCtrzs/pJNHEJ03orXyIHkQkFSvSSKTmB5hRKfWSVJZhWX5MvZIuiemc05zT3Obm3Ny8\
+		m7rP6+7MdnoIQWF76zwe+J3z/x+C+J+yTWd02OTpsE6lgZ5MAS1Nxvo4HxYJD+bRi1gbSYRp+DyM\
+		AwmGwAHytD87m+3w2drgW38Odu0pvKst2NY3g9E0wCYtglEc7w4IW2Wpdc6lEuzY2uH5lQO3Ugin\
+		Ih2OCT4YbSM2p67DOJCwG/R8Wpbi89Gt8BrK4Z7PhkshgGMyBYxWBPtsGUzDqdB85kYFbp9ILrTP\
+		X4PP2gbPwmW4ZjPhmEqFW1UK92INLKO5WOmJywvavi7lexhDLVhzM9xzWXBOp8MuTQKjbYT1RzFW\
+		vnIrgsPjSbyN6QL46Bdwq3LhnMmGQ5aBLQkPnqXHMPRy/fqeWFbXfYZd/niK1byPYdVvo1l1x0ma\
+		IAiCsIzzaZe6Aqy5FV5jC7ZXmsBoRWA0IngWH8GlrINzpgYO+T3YJ+/A2JsD9etIRtl+4t8elrFL\
+		jrVviayJusAah86xqwPxrKE/jnUv1sPWfxYbVC6cilosNCThe/FRUJmHMZhNroqzyeqgb+m/cMe2\
+		5GVwzT2EU3EfKlEift7mwdvXBP+CGExnOWS3uLtDWWRp4IBPsXAp62AZKYTuQxyovBDHdl8T8CQf\
+		qDoC1EfAJsrAoJDUBYJnLFQBzENXoHkXs6l8GRlOCTh+/3Q39steEw5KwPEfgFVdYaH6bi50XbFQ\
+		v4lq2PPFQtLoeXUDqAkHW0lgq5KA4SYHYiFpOhCw3HVape2MoVXPwkL3+5Krxx5MlET/NldFwFod\
+		guWSQ6DyObsDQvLugQB1Zwwv2LCSouPVYiGppwQcv1hIGvfgv6X5zFaYeSAgAAAAAElFTkSuQmCC\
+		);\
+}\
+'.replace(/[\r\n\t]/g, ''));
 
 
