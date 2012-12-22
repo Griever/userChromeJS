@@ -7,7 +7,8 @@
 // @compatibility  Firefox 11
 // @charset        UTF-8
 // @include        main
-// @version        0.0.7
+// @version        0.0.8
+// @note           0.0.8 Remove E4X
 // @note           0.0.7 後方一致のフィルタが誤爆する問題を修正
 // @note           0.0.6 URL が異様に長いとフリーズする問題を修正
 // @note           0.0.5 全体的に書き換え
@@ -266,80 +267,87 @@ window.gURLFilter = {
 			"右クリックでフィルタの編集",
 		].join("\n");
 
-		this.icon = $("urlbar-icons").appendChild($E(
-			<image id="urlfilter-icon" 
-			       tooltiptext="urlfilter" 
-			       context="urlfilter-menupopup" 
-			       onclick="gURLFilter.onClick(event);"/>
-		));
+		this.icon = $("urlbar-icons").appendChild($C("image", {
+			id: "urlfilter-icon",
+			tooltiptext: "urlfilter" ,
+			context: "urlfilter-menupopup" ,
+			onclick: "gURLFilter.onClick(event);",
+		}));
 		this.icon.style.padding = "0px 2px";
 
-		this.popup = $("mainPopupSet").appendChild($E(
-			<menupopup id="urlfilter-menupopup"
-			           onpopupshowing="gURLFilter.onPopupshowing(event);">
-				<menuitem label="フィルタを追加"
-				          accesskey="A"
-				          oncommand="gURLFilter.addFilter();"/>
-				<menuitem label="INI ファイルの再読み込み"
-				          accesskey="R"
-				          oncommand="gURLFilter.loadINI();"/>
-				<menuitem label="INI ファイルの編集"
-				          accesskey="E"
-				          oncommand="gURLFilter.editINI();"/>
-				<menuseparator />
-				<menu label="完全一致">
-					<menupopup popupType="kanzen"
-					           oncommand="gURLFilter.onFilterItemCommand(event);"
-					           onclick="gURLFilter.onFilterItemClick(event);"
-					           tooltiptext={menutooltiptext} />
-				</menu>
-				<menu label="前方一致">
-					<menupopup popupType="zenpou"
-					           oncommand="gURLFilter.onFilterItemCommand(event);"
-					           onclick="gURLFilter.onFilterItemClick(event);"
-					           tooltiptext={menutooltiptext} />
-				</menu>
-				<menu label="後方一致">
-					<menupopup popupType="kouhou"
-					           oncommand="gURLFilter.onFilterItemCommand(event);"
-					           onclick="gURLFilter.onFilterItemClick(event);"
-					           tooltiptext={menutooltiptext} />
-				</menu>
-				<menu label="部分一致">
-					<menupopup popupType="bubun"
-					           oncommand="gURLFilter.onFilterItemCommand(event);"
-					           onclick="gURLFilter.onFilterItemClick(event);"
-					           tooltiptext={menutooltiptext} />
-				</menu>
-				<menu label="正規表現など">
-					<menupopup popupType="seiki"
-					           oncommand="gURLFilter.onFilterItemCommand(event);"
-					           onclick="gURLFilter.onFilterItemClick(event);"
-					           tooltiptext={menutooltiptext} />
-				</menu>
-				<menu label="ホワイトリスト">
-					<menupopup popupType="white"
-					           oncommand="gURLFilter.onFilterItemCommand(event);"
-					           onclick="gURLFilter.onFilterItemClick(event);"
-					           tooltiptext={menutooltiptext} />
-				</menu>
-				<menuseparator class="urlfilter-menuend-separator" />
-			</menupopup>
-		));
+		var xml = '\
+			<menupopup id="urlfilter-menupopup"\
+			           onpopupshowing="gURLFilter.onPopupshowing(event);">\
+				<menuitem label="フィルタを追加"\
+				          accesskey="A"\
+				          oncommand="gURLFilter.addFilter();"/>\
+				<menuitem label="INI ファイルの再読み込み"\
+				          accesskey="R"\
+				          oncommand="gURLFilter.loadINI();"/>\
+				<menuitem label="INI ファイルの編集"\
+				          accesskey="E"\
+				          oncommand="gURLFilter.editINI();"/>\
+				<menuseparator />\
+				<menu label="完全一致">\
+					<menupopup popupType="kanzen"\
+					           oncommand="gURLFilter.onFilterItemCommand(event);"\
+					           onclick="gURLFilter.onFilterItemClick(event);"\
+					           tooltiptext="'+ menutooltiptext +'" />\
+				</menu>\
+				<menu label="前方一致">\
+					<menupopup popupType="zenpou"\
+					           oncommand="gURLFilter.onFilterItemCommand(event);"\
+					           onclick="gURLFilter.onFilterItemClick(event);"\
+					           tooltiptext="'+ menutooltiptext +'" />\
+				</menu>\
+				<menu label="後方一致">\
+					<menupopup popupType="kouhou"\
+					           oncommand="gURLFilter.onFilterItemCommand(event);"\
+					           onclick="gURLFilter.onFilterItemClick(event);"\
+					           tooltiptext="'+ menutooltiptext +'" />\
+				</menu>\
+				<menu label="部分一致">\
+					<menupopup popupType="bubun"\
+					           oncommand="gURLFilter.onFilterItemCommand(event);"\
+					           onclick="gURLFilter.onFilterItemClick(event);"\
+					           tooltiptext="'+ menutooltiptext +'" />\
+				</menu>\
+				<menu label="正規表現など">\
+					<menupopup popupType="seiki"\
+					           oncommand="gURLFilter.onFilterItemCommand(event);"\
+					           onclick="gURLFilter.onFilterItemClick(event);"\
+					           tooltiptext="'+ menutooltiptext +'" />\
+				</menu>\
+				<menu label="ホワイトリスト">\
+					<menupopup popupType="white"\
+					           oncommand="gURLFilter.onFilterItemCommand(event);"\
+					           onclick="gURLFilter.onFilterItemClick(event);"\
+					           tooltiptext="'+ menutooltiptext +'" />\
+				</menu>\
+				<menuseparator class="urlfilter-menuend-separator" />\
+			</menupopup>\
+		';
+		var range = document.createRange();
+		range.selectNodeContents($('mainPopupSet'));
+		range.collapse(false);
+		range.insertNode(range.createContextualFragment(xml.replace(/\n|\t/g, '')));
+		range.detach();
 
 		var ins = $("spell-separator");
-		ins.parentNode.insertBefore($E(<>
-			<menuitem id="context-urlfilter-add-image"
-			          label="画像の URL を urlfilter に登録"
-			          class="menuitem-iconic"
-			          accesskey="U"
-			          oncommand="gURLFilter.addFilter(gContextMenu.mediaURL);" />
-			<menuitem id="context-urlfilter-add-frame"
-			          label="フレームの URL を urlfilter に登録"
-			          class="menuitem-iconic"
-			          accesskey="F"
-			          oncommand="gURLFilter.addFilter(gContextMenu.target.ownerDocument.location.href);" />
-		</>), ins);
+		ins.parentNode.insertBefore($C("menuitem", {
+			id: "context-urlfilter-add-image",
+			label: "画像の URL を urlfilter に登録",
+			class: "menuitem-iconic",
+			accesskey: "U",
+			oncommand: "gURLFilter.addFilter(gContextMenu.mediaURL);",
+		}), ins);
+		ins.parentNode.insertBefore($C("menuitem", {
+			id: "context-urlfilter-add-frame",
+			label: "フレームの URL を urlfilter に登録",
+			class: "menuitem-iconic",
+			accesskey: "F",
+			oncommand: "gURLFilter.addFilter(gContextMenu.target.ownerDocument.location.href);",
+		}), ins);
 
 		this.loadPrefSetting();
 		this.loadINI() || this.importJSON();
@@ -396,12 +404,12 @@ window.gURLFilter = {
 				var m = popup.insertBefore(document.createElement("menuitem"), popup.firstChild);
 				m.setAttribute("label", "urlfilter に追加");
 				m.setAttribute("accesskey", "A");
-				m.setAttribute("oncommand", <![CDATA[
-					var rich = this.parentNode.parentNode.querySelector('richlistbox');
-					if (!rich || rich.selectedIndex === -1) return;
-					var label = rich.selectedItem.querySelector('.webconsole-msg-url');
-					if (label) gURLFilter.addFilter(label.value);
-				]]>.toString());
+				m.setAttribute("oncommand", [
+					"var rich = this.parentNode.parentNode.querySelector('richlistbox');"
+					,"if (!rich || rich.selectedIndex === -1) return;"
+					,"var label = rich.selectedItem.querySelector('.webconsole-msg-url');"
+					,"if (label) gURLFilter.addFilter(label.value);"
+				].join("\n"));
 				break;
 			case "unload":
 				this.uninit();
@@ -866,19 +874,10 @@ function $(id) { return document.getElementById(id); }
 function $$(exp, doc) { return Array.prototype.slice.call((doc || document).querySelectorAll(exp)); }
 function $A(args) { return Array.prototype.slice.call(args); }
 function U(text) 1 < 'あ'.length ? decodeURIComponent(escape(text)) : text;
-function $E(xml, doc) {
-	doc = doc || document;
-	xml = <root xmlns={doc.documentElement.namespaceURI}/>.appendChild(xml);
-	var settings = XML.settings();
-	XML.prettyPrinting = false;
-	var root = new DOMParser().parseFromString(xml.toXMLString(), 'application/xml').documentElement;
-	XML.setSettings(settings);
-	doc.adoptNode(root);
-	var range = doc.createRange();
-	range.selectNodeContents(root);
-	var frag = range.extractContents();
-	range.detach();
-	return frag.childNodes.length < 2 ? frag.firstChild : frag;
+function $C(name, attr) {
+	var el = document.createElement(name);
+	if (attr) Object.keys(attr).forEach(function(n) el.setAttribute(n, attr[n]));
+	return el;
 }
 function addStyle(css) {
 	var pi = document.createProcessingInstruction(
@@ -888,47 +887,46 @@ function addStyle(css) {
 	return document.insertBefore(pi, document.documentElement);
 }
 
-})(<![CDATA[
-/*
- * Some icons by Yusuke Kamiyamane. All rights reserved.
- * http://p.yusukekamiyamane.com/
- */
-#urlfilter-icon,
-#context-urlfilter-add-image,
-#context-urlfilter-add-frame {
-  list-style-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAB5ElEQVQ4jZ3OQUgiURzH8R8y4CAooiCEeFLRq9QQQwSBdApBpEMMpAdpKQ8TrHSaw7peBOnQIeiSgZWF0im6hBDUwByWd2io1qi85AheOs15+O9lW0ifl/3Dgwff9z78gbFpAN4OoLSBZgfQO4D+9640AO/4+y9zAsycAy1jYa4/Kpdsu6o5dlVzRuWSbSzM9c+B1gkww/3cALynwNnTWnb0sbNNw3z+y/nY2aantezoFDjjbnIMKHfzs/2hukW9XM65SCYHdY/HrHs85kUyOejlcs5Q3aK7+dn+MaBMAEdA82WzYN9nMtSKxQYVoK4BYQ0IV4B6KxYb3Gcy9LJZsI+A5gRwCOhvpaJjpNNUc7tNDQh/Ng0I19xu00in6a1UdA4BfQI4AFhvI083skwVgI33CsBuZJl+F9fpgNOxD7AHZZW6qdRUoJtK0YOySvs8YA9gj9kVuk0kpgK3iQQ9ZldojwfsAux1eYlYJDIVYJEIvS4v0S4PqAHsfVGm51BoKvAcCtH7okw1HiBJ0oZpmtRud0mSpDKnf2OM0eWlzu2IRqP/gHg8rvL6J8Dr8Pl8qmVZdHVlUCAQ+D7eg8GgalkWXV//Ir/fP9EhimJeEISKIAg/RVEs8LrL5fohCEKV1/97/gCuDO25VCRH2wAAAABJRU5ErkJggg==");
-}
-
-#urlfilter-icon[state="off"] {
-  filter: url("chrome://mozapps/skin/extensions/extensions.svg#greyscale");
-}
-
-#urlfilter-icon[state="blocked"] {
-  list-style-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACZElEQVQ4jZ3MXUhTcRjH8Z92wJOk+FKDkBGk4oJuZI6aIUnDbkIwSZJBkwjLJCa0JGKCyxvZ8KILqyG+m62thWgLMt9ag6PJP3DaUGej1GN6QAmbuwnH01WH1NNNP3iuvjwfYN86gBQPYHQDPR4g4AECbqDnnRGdbAAD069xff+PvD7guAvoF84VRDYstdFokzUebbLGv9+7Ff1oP/rzx/Lj2LT30IuJLvAHnjuAlGfA81Bl2cZWfR2tmUzyRe4baGWsknZjLyk0eF4SPLh8AOgFjB/OaCNr5ts0X14e92o0q47k5GDLkeTZscb02PZXO1VUVNDmonXX/yTh7YQN3B6gE+gJ11RFZ0pLqT8nZ9UGOKxAlucOrk65Tq9uiw0EgNYXakjoOrE+7oJhD9AOBL7U3ogLBgM1JyUFrUAWgITRPjiXQ9c25+cu0htfPc3OFNOnibO/RvvgBJAgA08BNl9tonG9nmwAAwBfGwr9r45Nflu8QJGQlgBQJKSlSKiA3ntTJn1tKJSBVoDNGa/QSH6+DAw60R6eOilJS6dICmsotvWApLCGpLCGFoUsadCJdhl4BLDPZZfIn5cnA70OtHbbIXTbIbTVYcdlOUzehnTqqMNOtx1CrwOtMtACsKWSYmJqtQz8PRvAmFpNSyXF1KLQ0QywlSI9LahU/wQWVCpaKdJTsxKg0+mqg8Egud0jpNPpLAr9JmOMhoYCih3Z2dkykJuba1bqfwCljtTUVLMoiuTzCZSRkXF3f8/MzDSLokjDw9OUlpZ2oIPneRPHcTaO4x7yPF+l1BMTExs5jmtS6v+932DjNskjJRnPAAAAAElFTkSuQmCC");
-}
-
-/* アイコンを U に見せるために逆さにする。！マークがひっくり返る… */
-#urlfilter-icon,
-#context-urlfilter-add-image .menu-iconic-icon,
-#context-urlfilter-add-frame .menu-iconic-icon{
-  -moz-transform:  rotate(180deg);
-}
-
-
-.urlfilter-menuend-separator:last-child,
-#context-copyimage[hidden="true"] ~ #context-urlfilter-add-image,
-#frame[hidden="true"] ~ #context-urlfilter-add-frame,
-#urlfilter-menupopup[hasmanager="false"] > #urlfilter-run-manager,
-#urlfilter-menupopup[hasmanager="false"] > #urlfilter-run-elements
-  { display: none; }
-
-
-]]>.toString()
-,<![CDATA[
-; Opera の urlfilter.ini のような完全一致
-; ワイルドカード（*）と下記パターンが利用可能
-; ・"://*." は Chrome の @match の様な動作
-; ・/～/ で正規表現。大文字小文字は区別せず。部分一致。
-; ・@@ で始まる行はホワイトリスト
-]]>.toString()
+})('\
+/*\
+ * Some icons by Yusuke Kamiyamane. All rights reserved.\
+ * http://p.yusukekamiyamane.com/\
+ */\
+#urlfilter-icon,\
+#context-urlfilter-add-image,\
+#context-urlfilter-add-frame {\
+  list-style-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAB5ElEQVQ4jZ3OQUgiURzH8R8y4CAooiCEeFLRq9QQQwSBdApBpEMMpAdpKQ8TrHSaw7peBOnQIeiSgZWF0im6hBDUwByWd2io1qi85AheOs15+O9lW0ifl/3Dgwff9z78gbFpAN4OoLSBZgfQO4D+9640AO/4+y9zAsycAy1jYa4/Kpdsu6o5dlVzRuWSbSzM9c+B1gkww/3cALynwNnTWnb0sbNNw3z+y/nY2aantezoFDjjbnIMKHfzs/2hukW9XM65SCYHdY/HrHs85kUyOejlcs5Q3aK7+dn+MaBMAEdA82WzYN9nMtSKxQYVoK4BYQ0IV4B6KxYb3Gcy9LJZsI+A5gRwCOhvpaJjpNNUc7tNDQh/Ng0I19xu00in6a1UdA4BfQI4AFhvI083skwVgI33CsBuZJl+F9fpgNOxD7AHZZW6qdRUoJtK0YOySvs8YA9gj9kVuk0kpgK3iQQ9ZldojwfsAux1eYlYJDIVYJEIvS4v0S4PqAHsfVGm51BoKvAcCtH7okw1HiBJ0oZpmtRud0mSpDKnf2OM0eWlzu2IRqP/gHg8rvL6J8Dr8Pl8qmVZdHVlUCAQ+D7eg8GgalkWXV//Ir/fP9EhimJeEISKIAg/RVEs8LrL5fohCEKV1/97/gCuDO25VCRH2wAAAABJRU5ErkJggg==");\
+}\
+\
+#urlfilter-icon[state="off"] {\
+  filter: url("chrome://mozapps/skin/extensions/extensions.svg#greyscale");\
+}\
+\
+#urlfilter-icon[state="blocked"] {\
+  list-style-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACZElEQVQ4jZ3MXUhTcRjH8Z92wJOk+FKDkBGk4oJuZI6aIUnDbkIwSZJBkwjLJCa0JGKCyxvZ8KILqyG+m62thWgLMt9ag6PJP3DaUGej1GN6QAmbuwnH01WH1NNNP3iuvjwfYN86gBQPYHQDPR4g4AECbqDnnRGdbAAD069xff+PvD7guAvoF84VRDYstdFokzUebbLGv9+7Ff1oP/rzx/Lj2LT30IuJLvAHnjuAlGfA81Bl2cZWfR2tmUzyRe4baGWsknZjLyk0eF4SPLh8AOgFjB/OaCNr5ts0X14e92o0q47k5GDLkeTZscb02PZXO1VUVNDmonXX/yTh7YQN3B6gE+gJ11RFZ0pLqT8nZ9UGOKxAlucOrk65Tq9uiw0EgNYXakjoOrE+7oJhD9AOBL7U3ogLBgM1JyUFrUAWgITRPjiXQ9c25+cu0htfPc3OFNOnibO/RvvgBJAgA08BNl9tonG9nmwAAwBfGwr9r45Nflu8QJGQlgBQJKSlSKiA3ntTJn1tKJSBVoDNGa/QSH6+DAw60R6eOilJS6dICmsotvWApLCGpLCGFoUsadCJdhl4BLDPZZfIn5cnA70OtHbbIXTbIbTVYcdlOUzehnTqqMNOtx1CrwOtMtACsKWSYmJqtQz8PRvAmFpNSyXF1KLQ0QywlSI9LahU/wQWVCpaKdJTsxKg0+mqg8Egud0jpNPpLAr9JmOMhoYCih3Z2dkykJuba1bqfwCljtTUVLMoiuTzCZSRkXF3f8/MzDSLokjDw9OUlpZ2oIPneRPHcTaO4x7yPF+l1BMTExs5jmtS6v+932DjNskjJRnPAAAAAElFTkSuQmCC");\
+}\
+\
+/* アイコンを U に見せるために逆さにする。！マークがひっくり返る… */\
+#urlfilter-icon,\
+#context-urlfilter-add-image .menu-iconic-icon,\
+#context-urlfilter-add-frame .menu-iconic-icon{\
+  -moz-transform:  rotate(180deg);\
+}\
+\
+\
+.urlfilter-menuend-separator:last-child,\
+#context-copyimage[hidden="true"] ~ #context-urlfilter-add-image,\
+#frame[hidden="true"] ~ #context-urlfilter-add-frame,\
+#urlfilter-menupopup[hasmanager="false"] > #urlfilter-run-manager,\
+#urlfilter-menupopup[hasmanager="false"] > #urlfilter-run-elements\
+  { display: none; }\
+\
+\
+','\
+; Opera の urlfilter.ini のような完全一致\
+; ワイルドカード（*）と下記パターンが利用可能\
+; ・"://*." は Chrome の @match の様な動作\
+; ・/～/ で正規表現。大文字小文字は区別せず。部分一致。\
+; ・@@ で始まる行はホワイトリスト\
+'
 );

@@ -7,7 +7,8 @@
 // @compatibility  Firefox 17
 // @charset        UTF-8
 // @include        main
-// @version        0.0.3
+// @version        0.0.4
+// @note           0.0.4 他の拡張などと干渉しにくくした
 // @note           0.0.3 Remove E4X
 // @note           0.0.3 新しいタブへの引継ぎを改善
 // @note           0.0.2 試験的に要素をまたいでいても強引にハイライトできるようにした
@@ -89,12 +90,6 @@ window.gWHT = {
 		return this.getRangeAll(win).join(" ").trim();
 	},
 	init: function() {
-		var func = handleLinkClick.toString();
-		if (func.indexOf("gWHT") === -1) {
-			func = func.replace("var where", 
-				"if (window.gWHT) gWHT.lastClickedTime = new Date().getTime();\n  var where");
-			eval("window.handleLinkClick = " + func);
-		}
 		this.xulstyle = addStyle(CSS);
 
 		var bb = document.getElementById("appcontent");
@@ -134,6 +129,7 @@ window.gWHT = {
 //		menuitem.setAttribute("oncommand", "gWHT.recoveryItems();");
 
 		gBrowser.mPanelContainer.addEventListener("DOMContentLoaded", this, false);
+		gBrowser.mPanelContainer.addEventListener("click", this, false);
 		gBrowser.mPanelContainer.addEventListener("drop", this, false);
 		gBrowser.mTabContainer.addEventListener("TabOpen", this, false);
 		gBrowser.mTabContainer.addEventListener("TabSelect", this, false);
@@ -143,6 +139,7 @@ window.gWHT = {
 	},
 	uninit: function() {
 		gBrowser.mPanelContainer.removeEventListener("DOMContentLoaded", this, false);
+		gBrowser.mPanelContainer.removeEventListener("click", this, false);
 		gBrowser.mPanelContainer.removeEventListener("drop", this, false);
 		gBrowser.mTabContainer.removeEventListener("TabOpen", this, false);
 		gBrowser.mTabContainer.removeEventListener("TabSelect", this, false);
@@ -160,6 +157,9 @@ window.gWHT = {
 	},
 	handleEvent: function(event) {
 		switch(event.type) {
+			case "click":
+				this.lastClickedTime = new Date().getTime();
+				break;
 			case "drop":
 				var dt = event.dataTransfer;
 				if (dt) {
@@ -225,12 +225,12 @@ window.gWHT = {
 		var win = doc.defaultView;
 		var tab = gBrowser._getTabForContentWindow(win);
 		var toolbar = this.toolbars[tab.linkedPanel];
-		var hasRef = !!tab.linkedBrowser.docShell.referringURI;
+		var canGoBack = tab.linkedBrowser.docShell.canGoBack;
 		var owntab = tab.owner;
 		var clickflag = this.lastOpenedTime - this.lastClickedTime < 100;
 
-		if (clickflag) {
-			if (owntab) {
+		if (owntab) {
+			if (!canGoBack && (clickflag || win.opener)) {
 				let ownbar = this.toolbars[owntab.linkedPanel];
 				if (ownbar && ownbar.items.length) {
 					toolbar = this.addToolbar(tab);

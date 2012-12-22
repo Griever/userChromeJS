@@ -2,11 +2,12 @@
 // @name           OperaStyle_gotoNickname.uc.js
 // @namespace      http://d.hatena.ne.jp/Griever/
 // @include        main
-// @varsion        0.0.4
-// @note           最後に使ったキーワードを記憶するようにした
+// @charset        UTF-8
+// @varsion        0.0.5
+// @note           0.0.5 Remove E4X
 // ==/UserScript==
 /*
-Shift＋F2 又は keyconfig 等で gotoNickname.open() を実行。
+keyconfig 等で gotoNickname.open() を実行。
 gotoNickname.open("google"); でも可能。
 */
 if (window.gotoNickname) {
@@ -46,8 +47,7 @@ window.gotoNickname= {
 					var keyword = bmsvc.getKeywordForURI(uri);
 					if (keyword) ret.push(keyword);
 				}
-				else if (PlacesUtils.nodeIsFolder(childNode) &&
-						 !PlacesUtils.nodeIsLivemarkContainer(childNode))
+				else if (PlacesUtils.nodeIsFolder(childNode))
 					// call this function recursive
 					ret = ret.concat(arguments.callee(childNode.itemId));
 			}
@@ -71,6 +71,7 @@ window.gotoNickname= {
 	},
 
 	onPopupshown: function(event) {
+		this.input.inputField.style.imeMode = "inactive";
 		this.input.select();
 		if (this.BEEP) this.beep();
 	},
@@ -103,43 +104,37 @@ window.gotoNickname= {
 		}
 	},
 	init: function(){
-		this.panel = $('mainPopupSet').appendChild($E(
-			<panel id="gotoNickname-panel" width="300" height="80"
-			       onpopupshown="gotoNickname.onPopupshown(event);"
-			       onpopuphidden="gotoNickname.onPopuphidden(event);">
-				<description value={U("ブックマークのキーワードを入力してください")} />
-				<textbox id="gotoNickname-input" 
-				         onkeypress="gotoNickname.onKeypress(event)"
-				         oninput="gotoNickname.onInput(event);"/>
-				<label id="gotoNickname-label" crop="end" value=""/>
-			</panel>
-		));
-		this.input = $('gotoNickname-input');
-		this.input.inputField.style.imeMode = "inactive";
-		this.label = $('gotoNickname-label');
-		this.panel.style.backgroundColor = '-moz-dialog';
-		this.panel.style.padding = '10px';
-		
-		$('mainKeyset').appendChild($E(
-			<key keycode="VK_F2" modifiers="shift" oncommand="gotoNickname.open();"/>
-		));
+		this.panel = $('mainPopupSet').appendChild($C("panel", {
+			id: "gotoNickname-panel",
+			width: "300",
+			height: "80",
+			onpopupshowing: "gotoNickname.onPopupshowing(event);",
+			onpopupshown: "gotoNickname.onPopupshown(event);",
+			onpopuphidden: "gotoNickname.onPopuphidden(event);",
+			style: "background-color: -moz-dialog; padding: 10px;"
+		}));
 
-		// http://gist.github.com/348749
+		this.panel.appendChild($C("description", {
+			value: "ブックマークのキーワードを入力してください",
+		}));
+
+		this.input = this.panel.appendChild($C("textbox", {
+			id: "gotoNickname-input",
+			onkeypress: "gotoNickname.onKeypress(event)",
+			oninput: "gotoNickname.onInput(event);",
+		}));
+
+		this.label = this.panel.appendChild($C("description", {
+			id: "gotoNickname-label",
+			crop: "end",
+			value: "",
+		}));
+
 		function $(id) document.getElementById(id);
-		function U(text) 1 < 'あ'.length ? decodeURIComponent(escape(text)) : text;
-		function $E(xml, doc) {
-			doc = doc || document;
-			xml = <root xmlns={doc.documentElement.namespaceURI}/>.appendChild(xml);
-			var settings = XML.settings();
-			XML.prettyPrinting = false;
-			var root = new DOMParser().parseFromString(xml.toXMLString(), 'application/xml').documentElement;
-			XML.setSettings(settings);
-			doc.adoptNode(root);
-			var range = doc.createRange();
-			range.selectNodeContents(root);
-			var frag = range.extractContents();
-			range.detach();
-			return frag.childNodes.length < 2 ? frag.firstChild : frag;
+		function $C(name, attr) {
+			var el = document.createElement(name);
+			if (attr) Object.keys(attr).forEach(function(n) el.setAttribute(n, attr[n]));
+			return el;
 		}
 	},
 	destroy: function() {
