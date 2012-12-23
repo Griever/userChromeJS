@@ -6,7 +6,9 @@
 // @include        main
 // @license        MIT License
 // @compatibility  Firefox 4
-// @version        0.0.3
+// @charset        UTF-8
+// @version        0.0.4
+// @note           0.0.4 Remove E4X
 // @note           CSSEntry クラスを作った
 // @note           スタイルのテスト機能を作り直した
 // @note           ファイルが削除された場合 rebuild 時に CSS を解除しメニューを消すようにした
@@ -88,60 +90,67 @@ window.UCL = {
 		return win;
 	},
 	init: function() {
-		var menu = $E(
-			<menu id="usercssloader-menu" label="CSS" accesskey="C">
-				<menupopup id="usercssloader-menupopup">
-					<menu label={U("ﾒﾆｭ━━━(ﾟ∀ﾟ)━━━!!")}
-					      accesskey="C">
-						<menupopup id="usercssloader-submenupopup">
-							<menuitem label="Rebuild"
-							          accesskey="R"
-							          acceltext="Alt + R"
-							          oncommand="UCL.rebuild();" />
-							<menuseparator />
-							<menuitem label={U("新規作成")}
-							          accesskey="N"
-							          oncommand="UCL.create();" />
-							<menuitem label={U("CSS フォルダを開く")}
-							          accesskey="O"
-							          oncommand="UCL.openFolder();" />
-							<menuitem label={U("userChrome.css を編集")}
-							          hidden="true"
-							          oncommand="UCL.editUserCSS('userChrome.css')" />
-							<menuitem label={U("userContent.css を編集")}
-							          hidden="true"
-							          oncommand="UCL.editUserCSS('userContent.css')" />
-							<menuseparator />
-							<menuitem label={U("スタイルのテスト (Chrome)")}
-							          id="usercssloader-test-chrome"
-							          accesskey="C"
-							          oncommand="UCL.styleTest(window);" />
-							<menuitem label={U("スタイルのテスト (Webページ)")}
-							          id="usercssloader-test-content"
-							          accesskey="W"
-							          oncommand="UCL.styleTest();" />
-							<menuitem label={U("userstyles.org でスタイルを検索")}
-							          accesskey="S"
-							          oncommand="UCL.searchStyle();" />
-						</menupopup>
-					</menu>
-					<menu label=".uc.css" accesskey="U" hidden={!(UCL.USE_UC)}>
-						<menupopup id="usercssloader-ucmenupopup">
-							<menuitem label="Rebuild(.uc.js)"
-							          oncommand="UCL.UCrebuild();" />
-							<menuseparator id="usercssloader-ucsepalator"/>
-						</menupopup>
-					</menu>
-					<menuseparator id="ucl-sepalator"/>
-				</menupopup>
-			</menu>
-		);
+		var xml = '\
+			<menu id="usercssloader-menu" label="CSS" accesskey="C">\
+				<menupopup id="usercssloader-menupopup">\
+					<menu label="ﾒﾆｭ━━━(ﾟ∀ﾟ)━━━!!"\
+					      accesskey="C">\
+						<menupopup id="usercssloader-submenupopup">\
+							<menuitem label="Rebuild"\
+							          accesskey="R"\
+							          acceltext="Alt + R"\
+							          oncommand="UCL.rebuild();" />\
+							<menuseparator />\
+							<menuitem label="新規作成"\
+							          accesskey="N"\
+							          oncommand="UCL.create();" />\
+							<menuitem label="CSS フォルダを開く"\
+							          accesskey="O"\
+							          oncommand="UCL.openFolder();" />\
+							<menuitem label="userChrome.css を編集"\
+							          hidden="true"\
+							          oncommand="UCL.editUserCSS(\'userChrome.css\')" />\
+							<menuitem label="userContent.css を編集"\
+							          hidden="true"\
+							          oncommand="UCL.editUserCSS(\'userContent.css\')" />\
+							<menuseparator />\
+							<menuitem label="スタイルのテスト (Chrome)"\
+							          id="usercssloader-test-chrome"\
+							          accesskey="C"\
+							          oncommand="UCL.styleTest(window);" />\
+							<menuitem label="スタイルのテスト (Webページ)"\
+							          id="usercssloader-test-content"\
+							          accesskey="W"\
+							          oncommand="UCL.styleTest();" />\
+							<menuitem label="userstyles.org でスタイルを検索"\
+							          accesskey="S"\
+							          oncommand="UCL.searchStyle();" />\
+						</menupopup>\
+					</menu>\
+					<menu label=".uc.css" accesskey="U" hidden="'+ !UCL.USE_UC +'">\
+						<menupopup id="usercssloader-ucmenupopup">\
+							<menuitem label="Rebuild(.uc.js)"\
+							          oncommand="UCL.UCrebuild();" />\
+							<menuseparator id="usercssloader-ucsepalator"/>\
+						</menupopup>\
+					</menu>\
+					<menuseparator id="ucl-sepalator"/>\
+				</menupopup>\
+			</menu>\
+		';
 
-		var mainMenubar = document.getElementById("main-menubar");
-		mainMenubar.appendChild(menu);
+		var range = document.createRange();
+		range.selectNodeContents($('main-menubar'));
+		range.collapse(false);
+		range.insertNode(range.createContextualFragment(xml.replace(/\n|\t/g, '')));
+		range.detach();
 
-		var key = $E(<key id="usercssloader-rebuild-key" oncommand="UCL.rebuild();" key="R" modifiers="alt" />);
-		document.getElementById("mainKeyset").appendChild(key)
+		$("mainKeyset").appendChild($C("key", {
+			id: "usercssloader-rebuild-key",
+			oncommand: "UCL.rebuild();",
+			key: "R",
+			modifiers: "alt",
+		}));
 
 		this.rebuild();
 		this.initialized = true;
@@ -191,7 +200,7 @@ window.UCL = {
 			this.rebuildMenu(leafName);
 		}
 		if (this.initialized)
-			XULBrowserWindow.statusTextField.label = U("Rebuild しました");
+			XULBrowserWindow.statusTextField.label = "Rebuild しました";
 	},
 	loadCSS: function(aFile) {
 		var CSS = this.readCSS[aFile.leafName];
@@ -276,7 +285,7 @@ window.UCL = {
 	},
 	edit: function(aFile) {
 		var editor = Services.prefs.getCharPref("view_source.editor.path");
-		if (!editor) return alert(U("エディタのパスが未設定です。\n view_source.editor.path を設定してください"));
+		if (!editor) return alert("エディタのパスが未設定です。\n view_source.editor.path を設定してください");
 		try {
 			var UI = Cc["@mozilla.org/intl/scriptableunicodeconverter"].createInstance(Ci.nsIScriptableUnicodeConverter);
 			UI.charset = window.navigator.platform.toLowerCase().indexOf("win") >= 0? "Shift_JIS": "UTF-8";
@@ -289,7 +298,7 @@ window.UCL = {
 		} catch (e) {}
 	},
 	create: function(aLeafName) {
-		if (!aLeafName) aLeafName = prompt(U("ファイル名を入力してください"), new Date().toLocaleFormat("%Y_%m%d_%H%M%S"));
+		if (!aLeafName) aLeafName = prompt("ファイル名を入力してください", new Date().toLocaleFormat("%Y_%m%d_%H%M%S"));
 		if (aLeafName) aLeafName = aLeafName.replace(/\s+/g, " ").replace(/[\\/:*?\"<>|]/g, "");
 		if (!aLeafName || !/\S/.test(aLeafName)) return;
 		if (!/\.css$/.test(aLeafName)) aLeafName += ".css";
@@ -397,7 +406,7 @@ CSSEntry.prototype = {
 			}
 		}
 		if (this.lastModifiedTime !== 1 && isEnable && isForced) {
-			log(U(this.leafName + " の更新を確認しました。"));
+			log(this.leafName + " の更新を確認しました。");
 		}
 		this.lastModifiedTime = lastModifiedTime;
 		return this._enabled = isEnable;
@@ -444,25 +453,25 @@ CSSTester.prototype = {
 				break;
 			case "load":
 				var doc = this.dialog.document;
-				doc.body.innerHTML = <![CDATA[
-					<style type="text/css">
-						:not(input):not(select) { padding: 0px; margin: 0px; }
-						table { border-spacing: 0px; }
-						body, html, #main, #textarea { width: 100%; height: 100%; }
-						#textarea { font-family: monospace; }
-					</style>
-					<table id="main">
-						<tr height="100%">
-							<td colspan="4"><textarea id="textarea"></textarea></td>
-						</tr>
-						<tr height="40">
-							<td><input type="button" value="Preview" /></td>
-							<td><input type="button" value="Save" /></td>
-							<td width="80%"><span class="log"></span></td>
-							<td><input type="button" value="Close" /></td>
-						</tr>
-					</table>
-				]]>.toString();
+				doc.body.innerHTML = '\
+					<style type="text/css">\
+						:not(input):not(select) { padding: 0px; margin: 0px; }\
+						table { border-spacing: 0px; }\
+						body, html, #main, #textarea { width: 100%; height: 100%; }\
+						#textarea { font-family: monospace; }\
+					</style>\
+					<table id="main">\
+						<tr height="100%">\
+							<td colspan="4"><textarea id="textarea"></textarea></td>\
+						</tr>\
+						<tr height="40">\
+							<td><input type="button" value="Preview" /></td>\
+							<td><input type="button" value="Save" /></td>\
+							<td width="80%"><span class="log"></span></td>\
+							<td><input type="button" value="Close" /></td>\
+						</tr>\
+					</table>\
+				';
 				this.textbox = doc.querySelector("textarea");
 				this.previewButton = doc.querySelector('input[value="Preview"]');
 				this.saveButton = doc.querySelector('input[value="Save"]');
@@ -540,21 +549,13 @@ CSSTester.prototype = {
 UCL.init();
 
 function $(id) { return document.getElementById(id); }
-function U(text) 1 < 'あ'.length ? decodeURIComponent(escape(text)) : text;
-function $E(xml, doc) {
-	doc = doc || document;
-	xml = <root xmlns={doc.documentElement.namespaceURI}/>.appendChild(xml);
-	var settings = XML.settings();
-	XML.prettyPrinting = false;
-	var root = new DOMParser().parseFromString(xml.toXMLString(), 'application/xml').documentElement;
-	XML.setSettings(settings);
-	doc.adoptNode(root);
-	var range = doc.createRange();
-	range.selectNodeContents(root);
-	var frag = range.extractContents();
-	range.detach();
-	return frag.childNodes.length < 2 ? frag.firstChild : frag;
+function $A(arr) Array.slice(arr);
+function $C(name, attr) {
+	var el = document.createElement(name);
+	if (attr) Object.keys(attr).forEach(function(n) el.setAttribute(n, attr[n]));
+	return el;
 }
+
 function log() { Application.console.log(Array.slice(arguments)); }
 
 })();
