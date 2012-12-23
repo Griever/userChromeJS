@@ -3,7 +3,7 @@
 // @namespace      http://d.hatena.ne.jp/Griever/
 // @include        main
 // @charset        UTF-8
-// @varsion        0.0.5
+// @varsion        0.0.6
 // @note           0.0.5 Remove E4X
 // ==/UserScript==
 /*
@@ -108,7 +108,6 @@ window.gotoNickname= {
 			id: "gotoNickname-panel",
 			width: "300",
 			height: "80",
-			onpopupshowing: "gotoNickname.onPopupshowing(event);",
 			onpopupshown: "gotoNickname.onPopupshown(event);",
 			onpopuphidden: "gotoNickname.onPopuphidden(event);",
 			style: "background-color: -moz-dialog; padding: 10px;"
@@ -144,6 +143,3 @@ window.gotoNickname= {
 };
 
 gotoNickname.init();
-
-if (typeof window.opera == 'undefined') window.opera = { toString : function(){ return "[object OperaActions]" } };
-opera.gotoNickname = function(str){ gotoNickname.open(str) }
