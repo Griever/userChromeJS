@@ -7,7 +7,8 @@
 // @license        MIT License
 // @compatibility  Firefox 5
 // @charset        UTF-8
-// @version        0.0.5
+// @version        0.0.6
+// @note           0.0.5 Firefox 19 に合わせて修正
 // @note           0.0.5 Remove E4X
 // @note           0.0.4 設定ファイルから CSS を追加できるようにした
 // @note           0.0.4 label の無い menu を splitmenu 風の動作にした
@@ -217,8 +218,7 @@ window.addMenu = {
 				var state = [];
 				if (gContextMenu.onTextInput) 
 					state.push("input");
-				if (gContextMenu.isTextSelected || 
-				    gContextMenu.onTextInput && this.getInputSelection(gContextMenu.target))
+				if (gContextMenu.isContentSelected || gContextMenu.isTextSelected)
 					state.push("select");
 				if (gContextMenu.onLink)
 					state.push(gContextMenu.onMailtoLink ? "mailto" : "link");
@@ -639,8 +639,28 @@ window.addMenu = {
 		}
 	},
 	getSelection: function(win) {
+		// from getBrowserSelection Fx19
 		win || (win = this.focusedWindow);
-		return this.getRangeAll(win).join(" ") || this.getInputSelection(win.document.activeElement);
+		var selection  = this.getRangeAll(win).join(" ");
+		if (!selection) {
+			let element = document.commandDispatcher.focusedElement;
+			let isOnTextInput = function (elem) {
+				return elem instanceof HTMLTextAreaElement ||
+					(elem instanceof HTMLInputElement && elem.mozIsTextField(true));
+			};
+
+			if (isOnTextInput(element)) {
+				selection = element.QueryInterface(Ci.nsIDOMNSEditableElement)
+					.editor.selection.toString();
+			}
+		}
+
+		if (selection) {
+			selection = selection.replace(/^\s+/, "")
+				.replace(/\s+$/, "")
+				.replace(/\s+/g, " ");
+		}
+		return selection;
 	},
 	getRangeAll: function(win) {
 		win || (win = this.focusedWindow);
