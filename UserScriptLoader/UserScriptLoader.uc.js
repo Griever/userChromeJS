@@ -947,7 +947,7 @@ USL.injectScripts = function(safeWindow, rsflag) {
 		}
 	});
 	if (documentEnds.length) {
-		aDocument.addEventListener("DOMContentLoaded", function(event){
+		safeWindow.addEventListener("DOMContentLoaded", function(event){
 			event.currentTarget.removeEventListener(event.type, arguments.callee, false);
 			documentEnds.forEach(function(s) "delay" in s ? 
 				safeWindow.setTimeout(run, s.delay, s) : run(s));
@@ -973,7 +973,7 @@ USL.injectScripts = function(safeWindow, rsflag) {
 			return;
 		}
 
-		let sandbox = new Cu.Sandbox(safeWindow);
+		let sandbox = new Cu.Sandbox(safeWindow, {sandboxPrototype: safeWindow});
 		let GM_API = new USL.API(script, sandbox, safeWindow, aDocument);
 		for (let n in GM_API)
 			sandbox[n] = GM_API[n];
