@@ -5,7 +5,9 @@
 // @include        main
 // @compatibility  Firefox 5.0
 // @license        MIT License
-// @version        0.1.8.1
+// @version        0.1.8.2
+// @note           0.1.8.2 Firefox 22 用の修正
+// @note           0.1.8.2 require が機能していないのを修正
 // @note           0.1.8.1 Save Script が機能していないのを修正
 // @note           0.1.8.0 Remove E4X
 // @note           0.1.8.0 @match, @unmatch に超テキトーに対応
@@ -947,7 +949,7 @@ USL.injectScripts = function(safeWindow, rsflag) {
 		}
 	});
 	if (documentEnds.length) {
-		aDocument.addEventListener("DOMContentLoaded", function(event){
+		safeWindow.addEventListener("DOMContentLoaded", function(event){
 			event.currentTarget.removeEventListener(event.type, arguments.callee, false);
 			documentEnds.forEach(function(s) "delay" in s ? 
 				safeWindow.setTimeout(run, s.delay, s) : run(s));
@@ -968,12 +970,12 @@ USL.injectScripts = function(safeWindow, rsflag) {
 		}
 		if ("bookmarklet" in script.metadata) {
 			let func = new Function(script.code);
-			safeWindow.location.href = "javascript:" + func.toSource() + "();";
+			safeWindow.location.href = "javascript:" + encodeURIComponent(func.toSource()) + "();";
 			safeWindow.USL_run.push(script);
 			return;
 		}
 
-		let sandbox = new Cu.Sandbox(safeWindow);
+		let sandbox = new Cu.Sandbox(safeWindow, {sandboxPrototype: safeWindow});
 		let GM_API = new USL.API(script, sandbox, safeWindow, aDocument);
 		for (let n in GM_API)
 			sandbox[n] = GM_API[n];
@@ -1108,7 +1110,7 @@ USL.getContents = function(aURL, aCallback){
 			onLinkIconAvailable: function(aIconURL) {},
 		}
 	}
-	wbp.saveURI(uri, null, null, null, null, aFile);
+	wbp.saveURI(uri, null, null, null, null, aFile, null);
 	USL.debug("getContents: " + aURL);
 };
 

@@ -7,11 +7,12 @@
 // @compatibility  Firefox 16
 // @charset        UTF-8
 // @include        main
-// @version        0.0.2
+// @version        0.0.3
+// @note           0.0.3 操作を Shift+Alt+カーソルに変更(Win8のショートカットキーとダブっていたため)
 // @note           gist に放置していた物を移動
 // ==/UserScript==
 /*
-Windowsキー＋カーソルキーで動く。
+Shift＋Alt＋カーソルキーで動く。
 
 
 ※対応未定
@@ -62,15 +63,10 @@ window.gCrossFireModoki = {
 	handleEvent: function(event) {
 		switch(event.type){
 			case "keypress":
-				if (!event.getModifierState("OS")) return; // Winキーが押されていなければ終了
-				if (event.ctrlKey || event.shiftKey || event.altKey) return;
+				if (event.ctrlKey || !event.shiftKey || !event.altKey) return;
 
 				var dir = null;
 				switch(event.keyCode) {
-					case event.DOM_VK_WIN:
-						event.preventDefault(); // Winキーが無効にできない｡･ﾟ･(ﾉД`)･ﾟ･｡
-						event.stopPropagation();
-						return
 					case event.DOM_VK_UP:
 						dir = "up";
 						break;
