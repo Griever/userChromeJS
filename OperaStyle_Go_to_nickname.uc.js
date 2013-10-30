@@ -3,13 +3,18 @@
 // @namespace      http://d.hatena.ne.jp/Griever/
 // @include        main
 // @charset        UTF-8
-// @varsion        0.0.6
+// @varsion        0.0.7
+// @note           0.0.7 Firefox 25 の getShortcutOrURI 廃止に仮対応
 // @note           0.0.5 Remove E4X
 // ==/UserScript==
 /*
 keyconfig 等で gotoNickname.open() を実行。
 gotoNickname.open("google"); でも可能。
 */
+
+(function () {
+
+
 if (window.gotoNickname) {
 	window.gotoNickname.destroy();
 	delete window.gotoNickname;
@@ -143,3 +148,89 @@ window.gotoNickname= {
 };
 
 gotoNickname.init();
+
+function getShortcutOrURI(aURL, aPostDataRef, aMayInheritPrincipal) {
+  // Initialize outparam to false
+  if (aMayInheritPrincipal)
+    aMayInheritPrincipal.value = false;
+
+  var shortcutURL = null;
+  var keyword = aURL;
+  var param = "";
+
+  var offset = aURL.indexOf(" ");
+  if (offset > 0) {
+    keyword = aURL.substr(0, offset);
+    param = aURL.substr(offset + 1);
+  }
+
+  if (!aPostDataRef)
+    aPostDataRef = {};
+
+  var engine = Services.search.getEngineByAlias(keyword);
+  if (engine) {
+    var submission = engine.getSubmission(param);
+    aPostDataRef.value = submission.postData;
+    return submission.uri.spec;
+  }
+
+  [shortcutURL, aPostDataRef.value] =
+    PlacesUtils.getURLAndPostDataForKeyword(keyword);
+
+  if (!shortcutURL)
+    return aURL;
+
+  var postData = "";
+  if (aPostDataRef.value)
+    postData = unescape(aPostDataRef.value);
+
+  if (/%s/i.test(shortcutURL) || /%s/i.test(postData)) {
+    var charset = "";
+    const re = /^(.*)\&mozcharset=([a-zA-Z][_\-a-zA-Z0-9]+)\s*$/;
+    var matches = shortcutURL.match(re);
+    if (matches)
+      [, shortcutURL, charset] = matches;
+    else {
+      // Try to get the saved character-set.
+      try {
+        // makeURI throws if URI is invalid.
+        // Will return an empty string if character-set is not found.
+        charset = PlacesUtils.history.getCharsetForURI(makeURI(shortcutURL));
+      } catch (e) {}
+    }
+
+    // encodeURIComponent produces UTF-8, and cannot be used for other charsets.
+    // escape() works in those cases, but it doesn't uri-encode +, @, and /.
+    // Therefore we need to manually replace these ASCII characters by their
+    // encodeURIComponent result, to match the behavior of nsEscape() with
+    // url_XPAlphas
+    var encodedParam = "";
+    if (charset && charset != "UTF-8")
+      encodedParam = escape(convertFromUnicode(charset, param)).
+                     replace(/[+@\/]+/g, encodeURIComponent);
+    else // Default charset is UTF-8
+      encodedParam = encodeURIComponent(param);
+
+    shortcutURL = shortcutURL.replace(/%s/g, encodedParam).replace(/%S/g, param);
+
+    if (/%s/i.test(postData)) // POST keyword
+      aPostDataRef.value = getPostDataStream(postData, param, encodedParam,
+                                             "application/x-www-form-urlencoded");
+  }
+  else if (param) {
+    // This keyword doesn't take a parameter, but one was provided. Just return
+    // the original URL.
+    aPostDataRef.value = null;
+
+    return aURL;
+  }
+
+  // This URL came from a bookmark, so it's safe to let it inherit the current
+  // document's principal.
+  if (aMayInheritPrincipal)
+    aMayInheritPrincipal.value = true;
+
+  return shortcutURL;
+}
+
+})();
