@@ -7,7 +7,8 @@
 // @license        MIT License
 // @compatibility  Firefox 21
 // @charset        UTF-8
-// @version        0.0.8
+// @version        0.0.9
+// @note           0.0.9 Firefox 29 の Firefox Button 廃止に伴いファイルメニューに追加するように変更
 // @note           0.0.8 Firefox 25 の getShortcutOrURI 廃止に仮対応
 // @note           0.0.7 Firefox 21 の Favicon 周りの変更に対応
 // @note           0.0.6 Firefox 19 に合わせて修正
@@ -188,9 +189,9 @@ window.addMenu = {
 		ins = $("prefSep");
 		ins.parentNode.insertBefore(
 			$C("menuseparator", { id: "addMenu-tool-insertpoint", class: "addMenu-insert-point" }), ins.nextSibling);
-		ins = $("appmenu-quit");
+		ins = $("menu_FileQuitItem");
 		ins.parentNode.insertBefore(
-			$C("menuseparator", { id: "addMenu-app-insertpoint", class: "addMenu-insert-point" }), ins.nextSibling);
+			$C("menuseparator", { id: "addMenu-app-insertpoint", class: "addMenu-insert-point" }), ins);
 		ins = $("devToolsSeparator");
 		ins.parentNode.insertBefore($C("menuitem", {
 			id: "addMenu-rebuild",
