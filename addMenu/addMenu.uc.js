@@ -7,7 +7,8 @@
 // @license        MIT License
 // @compatibility  Firefox 21
 // @charset        UTF-8
-// @version        0.0.9
+// @version        0.1.0
+// @note           0.1.0 menugroup をとりあえず利用できるようにした
 // @note           0.0.9 Firefox 29 の Firefox Button 廃止に伴いファイルメニューに追加するように変更
 // @note           0.0.8 Firefox 25 の getShortcutOrURI 廃止に仮対応
 // @note           0.0.7 Firefox 21 の Favicon 周りの変更に対応
@@ -295,7 +296,8 @@ window.addMenu = {
 			{ current: "page", submenu: "PageMenu", insertId: "addMenu-page-insertpoint" },
 			{ current: "tab" , submenu: "TabMenu" , insertId: "addMenu-tab-insertpoint"  },
 			{ current: "tool", submenu: "ToolMenu", insertId: "addMenu-tool-insertpoint" },
-			{ current: "app" , submenu: "AppMenu" , insertId: "addMenu-app-insertpoint"  }
+			{ current: "app" , submenu: "AppMenu" , insertId: "addMenu-app-insertpoint"  },
+			{ current: "group", submenu: "GroupMenu" , insertId: "addMenu-page-insertpoint"  },
 		];
 
 		var data = loadText(aFile);
@@ -318,11 +320,17 @@ window.addMenu = {
 
 		aiueo.forEach(function({ current, submenu }){
 			sandbox["_" + current] = [];
-			sandbox[current] = function(itemObj) {
-				ps(itemObj, sandbox["_" + current]);
+			if (submenu != 'GroupMenu') {
+				sandbox[current] = function(itemObj) {
+					ps(itemObj, sandbox["_" + current]);
+				}
 			}
 			sandbox[submenu] = function(menuObj) {
-				menuObj._items = []
+				if (!menuObj)
+					menuObj = {};
+				menuObj._items = [];
+				if (submenu == 'GroupMenu')
+					menuObj._group = true;
 				sandbox["_" + current].push(menuObj);
 				return function(itemObj) {
 					ps(itemObj, menuObj._items);
@@ -357,7 +365,32 @@ window.addMenu = {
 
 		if (isAlert) this.alert(U("設定を再読み込みしました"));
 	},
+	newGroupMenu: function (menuObj) {
+		var group = document.createElement('menugroup');
+		Object.keys(menuObj).map(function(key) {
+			var val = menuObj[key];
+			if (key === "_items") return;
+			if (key === "_group") return;
+			if (typeof val == "function")
+				menuObj[key] = val = "(" + val.toSource() + ").call(this, event);";
+			group.setAttribute(key, val);
+		}, this);
+		let cls = group.classList;
+		cls.add('addMenu');
+
+		// 表示 / 非表示の設定
+		if (menuObj.condition)
+			this.setCondition(menu, menuObj.condition);
+
+		menuObj._items.forEach(function(obj) {
+			group.appendChild(this.newMenuitem(obj));
+		}, this);
+		return group;
+	},
 	newMenu: function(menuObj) {
+		if (menuObj._group) {
+			return this.newGroupMenu(menuObj);
+		}
 		var menu = document.createElement("menu");
 		var popup = menu.appendChild(document.createElement("menupopup"));
 		for (let [key, val] in Iterator(menuObj)) {
@@ -409,7 +442,7 @@ window.addMenu = {
 		var menuitem;
 		// label == separator か必要なプロパティが足りない場合は区切りとみなす
 		if (obj.label === "separator" || 
-		    (!obj.label && !obj.text && !obj.keyword && !obj.url && !obj.oncommand && !obj.command)) {
+		    (!obj.label && !obj.image && !obj.text && !obj.keyword && !obj.url && !obj.oncommand && !obj.command)) {
 			menuitem = document.createElement("menuseparator");
 		} else if (obj.oncommand || obj.command) {
 			let org = obj.command ? document.getElementById(obj.command) : null;
@@ -512,7 +545,7 @@ window.addMenu = {
 		}
 	},
 	removeMenuitem: function() {
-		$$('menu.addMenu').forEach(function(e) e.parentNode.removeChild(e) );
+		$$('menu.addMenu, menugroup.addMenu').forEach(function(e) e.parentNode.removeChild(e) );
 		$$('.addMenu').forEach(function(e) e.parentNode.removeChild(e) );
 	},
 	setIcon: function(menu, obj) {

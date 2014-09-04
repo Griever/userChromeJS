@@ -4,11 +4,12 @@
 // @namespace      http://d.hatena.ne.jp/Griever/
 // @author         Griever
 // @license        MIT License
-// @compatibility  Firefox 10
+// @compatibility  Firefox 32
 // @charset        UTF-8
 // @include        main
 // @screenshot     http://f.hatena.ne.jp/Griever/20120409200608
-// @version        0.0.3
+// @version        0.0.4
+// @note           0.0.4 なんかいじった
 // @note           0.0.3 CSS Selector も取得してみた
 // @note           0.0.3 E4X の修正忘れを修正
 // @note           0.0.2 Remove E4X
@@ -23,40 +24,62 @@ if (window.Inspector_de_Info) {
 
 window.Inspector_de_Info = {
 	getFocusedWindow: function(){
-		if (InspectorUI.selection)
-			return InspectorUI.selection.ownerDocument.defaultView;
 		var win = document.commandDispatcher.focusedWindow;
 		return (!win || win == window) ? window.content : win;
 	},
-	init: function() {
-		var popup = document.getElementById("inspector-node-popup");
-		if (!popup) return;
-		
-		this.xulstyle = addStyle(CSS);
-		this.icon = $("inspector-tools").appendChild(document.createElement("toolbarbutton"));
-		this.icon.setAttribute("id", "idei-button");
-		this.icon.setAttribute("class", "devtools-toolbarbutton");
-		this.icon.setAttribute("label", "INFO");
-		this.icon.setAttribute("accesskey", "Q");
-		this.icon.setAttribute("oncommand", "Inspector_de_Info.run();");
+	ready: function(subject, aToolbox) {
+		var doc = aToolbox.doc;
+		var win = doc.defaultView;
+		win.Inspector_de_Info = window.Inspector_de_Info;
 
-		var m = document.createElement("menu");
-		m.setAttribute("label", "Get Selector");
-		m.setAttribute("id", "idei-selector-menu");
-		m.setAttribute("accesskey", "S");
-		var p = m.appendChild(document.createElement("menupopup"));
-		p.setAttribute("onpopupshowing", "Inspector_de_Info.onPopupshowing(event)");
-		p.setAttribute("idei-type", "selector");
-		popup.insertBefore(m, popup.firstChild);
+		if (doc.getElementById("idei-container")) return;
 
-		var m = document.createElement("menu");
-		m.setAttribute("label", "Get XPath");
-		m.setAttribute("id", "idei-xpath-menu");
-		m.setAttribute("accesskey", "X");
-		var p = m.appendChild(document.createElement("menupopup"));
-		p.setAttribute("onpopupshowing", "Inspector_de_Info.onPopupshowing(event)");
-		p.setAttribute("idei-type", "xpath");
-		popup.insertBefore(m, popup.firstChild);
+		var inspectFrame = doc.getElementById("toolbox-panel-iframe-inspector");
+		if (!inspectFrame)
+			return;
+
+		inspectFrame.addEventListener("load", inspectFrameOnload, true);
+		if (inspectFrame.contentDocument)
+			inspectFrameOnload(inspectFrame.contentDocument);
+
+		function inspectFrameOnload(iDoc) {
+			inspectFrame.removeEventListener("load", inspectFrameOnload, true);
+
+			var popup = iDoc.getElementById("inspector-node-popup");
+
+			var m = iDoc.createElement("menu");
+			m.setAttribute("label", "Get Selector");
+			m.setAttribute("id", "idei-selector-menu");
+			m.setAttribute("accesskey", "S");
+			var p = m.appendChild(iDoc.createElement("menupopup"));
+			p.setAttribute("onpopupshowing", "window.top.Inspector_de_Info.onPopupshowing(event)");
+			p.setAttribute("idei-type", "selector");
+			popup.insertBefore(m, popup.firstChild);
+
+			var m = iDoc.createElement("menu");
+			m.setAttribute("label", "Get XPath");
+			m.setAttribute("id", "idei-xpath-menu");
+			m.setAttribute("accesskey", "X");
+			var p = m.appendChild(iDoc.createElement("menupopup"));
+			p.setAttribute("onpopupshowing", "window.top.Inspector_de_Info.onPopupshowing(event)");
+			p.setAttribute("idei-type", "xpath");
+			popup.insertBefore(m, popup.firstChild);
+		};
+
+		var buttons = doc.getElementById("toolbox-buttons");
+
+		var infobutton = buttons.insertBefore(document.createElement("toolbarbutton"), buttons.firstChild);
+		infobutton.setAttribute("id", "idei-button");
+		infobutton.setAttribute("class", "command-button");
+		infobutton.setAttribute("image", "resource://gre/chrome/toolkit/skin/classic/mozapps/plugins/pluginHelp-16.png");
+		infobutton.setAttribute("label", "INFO");
+		infobutton.setAttribute("accesskey", "Q");
+		infobutton.addEventListener("command", function(event) {
+			var container = doc.getElementById("idei-container");
+			if (container.hidden = !container.hidden) return;
+
+			doc.getElementById("idei-url").value = "^" + content.location.href.replace(/[()\[\]{}|+.,^$?\\]/g, "\\$&");
+		}, false);
 
 		var xml = '\
 			<hbox id="idei-container" hidden="true">\
@@ -104,9 +127,9 @@ window.Inspector_de_Info = {
 				</popupset>\
 				<vbox id="idei-hbox">\
 					<button label="JSON"\
-					        oncommand="Inspector_de_Info.checkInfo(true);"/>\
+					        oncommand="Inspector_de_Info.checkInfo(document, true);"/>\
 					<button label="launch"\
-					        oncommand="Inspector_de_Info.launch();"\
+					        oncommand="Inspector_de_Info.launch(document);"\
 					        tooltiptext="uAutoPagerize で実行してみます"/>\
 				</vbox>\
 				<grid id="idei-grid" flex="1">\
@@ -136,10 +159,13 @@ window.Inspector_de_Info = {
 			</hbox>\
 		';
 		var range = document.createRange();
-		range.selectNode($("inspector-toolbar"));
+		range.selectNode(inspectFrame);
 		range.collapse(false);
 		range.insertNode(range.createContextualFragment(xml.replace(/\n|\t/g, '')));
-		range.detach();
+	},
+	init: function() {
+		gDevTools.on("toolbox-ready", Inspector_de_Info.ready);
+
 
 		window.addEventListener("unload", this, false);
 	},
@@ -168,7 +194,7 @@ window.Inspector_de_Info = {
 		range.deleteContents();
 		range.detach();
 		
-		var elem = InspectorUI.selection;
+		var elem = popup.ownerDocument.defaultView.inspector.selection.node;
 		if (elem instanceof Text) elem = elem.parentNode;
 		if (!(elem instanceof Element)) return;
 
@@ -182,8 +208,7 @@ window.Inspector_de_Info = {
 			if (a.indexOf(str) !== i) return;
 			let m = document.createElement("menuitem");
 			m.setAttribute("label", str);
-			m.setAttribute("oncommand", "Inspector_de_Info.copyToClipboard(event)");
-			m.setAttribute("class", "menuitem-non-iconic");
+			m.setAttribute("oncommand", "window.top.Inspector_de_Info.copyToClipboard(event)");
 			m.style.setProperty("max-width","63em","important");
 			if (str.length > 110)
 				m.setAttribute("tooltiptext", str);
@@ -272,24 +297,29 @@ window.Inspector_de_Info = {
 		res.push(localName);
 		return res;
 	},
-	toJSON: function() {
+	toJSON: function(tDoc) {
 		var json = "{\n";
-		json += "\turl          : '" + $("idei-url").value.replace(/\\/g, "\\\\") + "'\n";
-		json += "\t,nextLink    : '" + $("idei-nextLink").value + "'\n";
-		json += "\t,pageElement : '" + $("idei-pageElement").value + "'\n";
-		if ($("idei-insertBefore").value)
-			json += "\t,insertBefore: '" + $("idei-insertBefore").value + "'\n";
-		json += "\t,exampleUrl  : '" + this.getFocusedWindow().location.href + "'\n";
+		json += "\turl          : '" + tDoc.getElementById("idei-url").value.replace(/\\/g, "\\\\") + "'\n";
+		json += "\t,nextLink    : '" + tDoc.getElementById("idei-nextLink").value + "'\n";
+		json += "\t,pageElement : '" + tDoc.getElementById("idei-pageElement").value + "'\n";
+		if (tDoc.getElementById("idei-insertBefore").value)
+			json += "\t,insertBefore: '" + tDoc.getElementById("idei-insertBefore").value + "'\n";
+		json += "\t,exampleUrl  : '" + content.location.href + "'\n";
 		json += "}";
+//		if (confirm(json + '\n\n設定ファイルに追記しますか？')) {
+//			this.addSaveFile('\nMY_SITEINFO.unshift('+ json +');');
+//			if (!window.uAutoPagerize) return
+//			uAutoPagerize.loadSetting(true);
+//		}
 		alert(json);
 	},
-	launch: function() {
+	launch: function(tDoc) {
 		var uap = window.uAutoPagerize;
 		if (!uap) return this.checkInfo(true);
-		var win = this.getFocusedWindow();
+		var win = content;
 		if (win.ap) return alert("既に実行されています");
 
-		var i = this.checkInfo();
+		var i = this.checkInfo(tDoc);
 		if (!i) return;
 
 		var [index, info] = uap.getInfo([i], win);
@@ -301,18 +331,35 @@ window.Inspector_de_Info = {
 			alert("この SITEINFO にはマッチしませんでした");
 		}
 	},
-	checkInfo: function(isAlert) {
+	addSaveFile: function(data) {
+		if (!window.uAutoPagerize)
+			return alert('uAutoPagerize がありません');
+		var file = uAutoPagerize.file;
+		if (!window.uAutoPagerize.file || !file.exists())
+			return alert('_uAutoPagerize.js が見つかりません');
+
+		var suConverter = Cc['@mozilla.org/intl/scriptableunicodeconverter'].createInstance(Ci.nsIScriptableUnicodeConverter);
+		suConverter.charset = 'UTF-8';
+		data = suConverter.ConvertFromUnicode(data);
+
+		var foStream = Cc['@mozilla.org/network/file-output-stream;1'].createInstance(Ci.nsIFileOutputStream);
+		foStream.init(file, 0x02 | 0x10, 0664, 0);
+		foStream.write(data, data.length);
+		foStream.close();
+	},
+	checkInfo: function(tDoc, isAlert) {
 		var i = {
-			url         : $("idei-url").value,
-			nextLink    : $("idei-nextLink").value,
-			pageElement : $("idei-pageElement").value,
-			insertBefore: $("idei-insertBefore").value
+			url         : tDoc.getElementById("idei-url").value,
+			nextLink    : tDoc.getElementById("idei-nextLink").value,
+			pageElement : tDoc.getElementById("idei-pageElement").value,
+			insertBefore: tDoc.getElementById("idei-insertBefore").value
 		};
 		if (!i.url || !i.nextLink || !i.pageElement)
 			return alert("入力値が不正です");
 		var logs = [];
-		var win = this.getFocusedWindow();
+		var win = content;
 		var doc = win.document;
+
 		try {
 			if (!new RegExp(i.url).test(doc.location.href))
 				logs.push("url がマッチしません");
@@ -341,7 +388,7 @@ window.Inspector_de_Info = {
 		if (logs.length) 
 			return alert(logs.join("\n"));
 		if (isAlert)
-			this.toJSON();
+			this.toJSON(tDoc);
 		return i;
 	},
 	NORMAL_TO_CLASS: 0,
@@ -388,6 +435,8 @@ window.Inspector_de_Info = {
 };
 
 window.Inspector_de_Info.init();
+
+
 
 
 function normal2class(xpath) {
