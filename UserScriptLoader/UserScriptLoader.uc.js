@@ -6,6 +6,7 @@
 // @compatibility  Firefox 35
 // @license        MIT License
 // @version        0.1.8.4
+// @note           0.1.8.4 add persistFlags for PERSIST_FLAGS_AUTODETECT_APPLY_CONVERSION to fix @require save data
 // @note           0.1.8.4 Firefox 35 用の修正
 // @note           0.1.8.4 エディタで Scratchpad を使えるようにした
 // @note           0.1.8.4 GM_notification を独自実装
@@ -1015,19 +1016,33 @@ USL.injectScripts = function(safeWindow, rsflag) {
 			documentEnds.push(script);
 		}
 	});
-	if (documentEnds.length) {
-		safeWindow.addEventListener("DOMContentLoaded", function(event){
-			event.currentTarget.removeEventListener(event.type, arguments.callee, false);
+	/* 画像を開いた際に実行されないので適当に実行する */
+	if (aDocument instanceof ImageDocument) {
+		safeWindow.setTimeout(function() {
 			documentEnds.forEach(function(s) "delay" in s ? 
-				safeWindow.setTimeout(run, s.delay, s) : run(s));
-		}, false);
-	}
-	if (windowLoads.length) {
-		safeWindow.addEventListener("load", function(event) {
-			event.currentTarget.removeEventListener(event.type, arguments.callee, false);
+				safeWindow.setTimeout(run, s.delay, s) :
+				run(s));
+		}, 10);
+		safeWindow.setTimeout(function() {
 			windowLoads.forEach(function(s) "delay" in s ? 
-				safeWindow.setTimeout(run, s.delay, s) : run(s));
-		}, false);
+				safeWindow.setTimeout(run, s.delay, s) :
+				run(s));
+		}, 300);
+	} else {
+		if (documentEnds.length) {
+			safeWindow.addEventListener("DOMContentLoaded", function(event){
+				event.currentTarget.removeEventListener(event.type, arguments.callee, false);
+				documentEnds.forEach(function(s) "delay" in s ? 
+					safeWindow.setTimeout(run, s.delay, s) : run(s));
+			}, false);
+		}
+		if (windowLoads.length) {
+			safeWindow.addEventListener("load", function(event) {
+				event.currentTarget.removeEventListener(event.type, arguments.callee, false);
+				windowLoads.forEach(function(s) "delay" in s ? 
+					safeWindow.setTimeout(run, s.delay, s) : run(s));
+			}, false);
+		}
 	}
 
 	function run(script) {
@@ -1177,6 +1192,8 @@ USL.getContents = function(aURL, aCallback){
 			onLinkIconAvailable: function(aIconURL) {},
 		}
 	}
+	wbp.persistFlags = Ci.nsIWebBrowserPersist.PERSIST_FLAGS_BYPASS_CACHE;
+	wbp.persistFlags |= Ci.nsIWebBrowserPersist.PERSIST_FLAGS_AUTODETECT_APPLY_CONVERSION;
 	wbp.saveURI(uri, null, null, null, null, aFile, null);
 	USL.debug("getContents: " + aURL);
 };

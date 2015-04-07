@@ -3,7 +3,8 @@
 // @namespace      http://d.hatena.ne.jp/Griever/
 // @include        main
 // @charset        UTF-8
-// @varsion        0.0.7
+// @varsion        0.0.8
+// @note           0.0.8 getKeywordForURI が廃止になるらしいので対応
 // @note           0.0.7 Firefox 25 の getShortcutOrURI 廃止に仮対応
 // @note           0.0.5 Remove E4X
 // ==/UserScript==
@@ -46,10 +47,10 @@ window.gotoNickname= {
 			for (var i = 0; i < parentNode.childCount; i++) {
 				var childNode = parentNode.getChild(i);
 				if (PlacesUtils.nodeIsBookmark(childNode)){
-					var uri = ios.newURI(childNode.uri, null, null);
-					if (uri.spec.indexOf('%s') >= 0)
+					// var uri = ios.newURI(childNode.uri, null, null);
+					if (childNode.uri.indexOf('%s') >= 0)
 						continue;
-					var keyword = bmsvc.getKeywordForURI(uri);
+					var keyword = bmsvc.getKeywordForBookmark(childNode.itemId);
 					if (keyword) ret.push(keyword);
 				}
 				else if (PlacesUtils.nodeIsFolder(childNode))
@@ -63,7 +64,8 @@ window.gotoNickname= {
 
 	open: function(str){
 		if (str){
-			loadURI(getShortcutOrURI(str ,{}));
+			// loadURI(getShortcutOrURI(str ,{}));
+			this.loadKeyword(str);
 			return;
 		}
 		this.panel.openPopupAtScreen(
@@ -92,7 +94,8 @@ window.gotoNickname= {
 		}
 		var matchKeywords = this.keywords.filter(function(e) e.indexOf(value) === 0);
 		if (matchKeywords.length === 1) {
-			loadURI(getShortcutOrURI(matchKeywords[0],{}));
+			// loadURI(getShortcutOrURI(matchKeywords[0],{}));
+			this.loadKeyword(matchKeywords[0]);
 			content.focus();
 			this.lastMatchedKeyword = matchKeywords[0];
 			this.panel.hidePopup();
@@ -103,7 +106,8 @@ window.gotoNickname= {
 	onKeypress: function(event) {
 		var {keyCode:k, charCode:w, ctrlKey:c, shiftKey:s, altKey:a} = event;
 		if (k === event.DOM_VK_RETURN && !c && !s && !a) {
-			loadURI(getShortcutOrURI(this.input.value ,{}));
+			// loadURI(getShortcutOrURI(this.input.value ,{}));
+			this.loadKeyword(this.input.value);
 			content.focus();
 			this.panel.hidePopup();
 		}
@@ -145,92 +149,17 @@ window.gotoNickname= {
 		var elem = document.getElementById('gotoNickname-panel');
 		if (elem) elem.parentNode.removeChild(elem);
 	},
+	loadKeyword: function(keyword) {
+		getShortcutOrURIAndPostData(keyword, function({url}) {
+			if (gBrowser.mCurrentTab.pinned && !url.startsWith('javascript')) {
+				openNewTabWith(url)
+			} else {
+				loadURI(url);
+			}
+		});
+	}
 };
 
 gotoNickname.init();
-
-function getShortcutOrURI(aURL, aPostDataRef, aMayInheritPrincipal) {
-  // Initialize outparam to false
-  if (aMayInheritPrincipal)
-    aMayInheritPrincipal.value = false;
-
-  var shortcutURL = null;
-  var keyword = aURL;
-  var param = "";
-
-  var offset = aURL.indexOf(" ");
-  if (offset > 0) {
-    keyword = aURL.substr(0, offset);
-    param = aURL.substr(offset + 1);
-  }
-
-  if (!aPostDataRef)
-    aPostDataRef = {};
-
-  var engine = Services.search.getEngineByAlias(keyword);
-  if (engine) {
-    var submission = engine.getSubmission(param);
-    aPostDataRef.value = submission.postData;
-    return submission.uri.spec;
-  }
-
-  [shortcutURL, aPostDataRef.value] =
-    PlacesUtils.getURLAndPostDataForKeyword(keyword);
-
-  if (!shortcutURL)
-    return aURL;
-
-  var postData = "";
-  if (aPostDataRef.value)
-    postData = unescape(aPostDataRef.value);
-
-  if (/%s/i.test(shortcutURL) || /%s/i.test(postData)) {
-    var charset = "";
-    const re = /^(.*)\&mozcharset=([a-zA-Z][_\-a-zA-Z0-9]+)\s*$/;
-    var matches = shortcutURL.match(re);
-    if (matches)
-      [, shortcutURL, charset] = matches;
-    else {
-      // Try to get the saved character-set.
-      try {
-        // makeURI throws if URI is invalid.
-        // Will return an empty string if character-set is not found.
-        charset = PlacesUtils.history.getCharsetForURI(makeURI(shortcutURL));
-      } catch (e) {}
-    }
-
-    // encodeURIComponent produces UTF-8, and cannot be used for other charsets.
-    // escape() works in those cases, but it doesn't uri-encode +, @, and /.
-    // Therefore we need to manually replace these ASCII characters by their
-    // encodeURIComponent result, to match the behavior of nsEscape() with
-    // url_XPAlphas
-    var encodedParam = "";
-    if (charset && charset != "UTF-8")
-      encodedParam = escape(convertFromUnicode(charset, param)).
-                     replace(/[+@\/]+/g, encodeURIComponent);
-    else // Default charset is UTF-8
-      encodedParam = encodeURIComponent(param);
-
-    shortcutURL = shortcutURL.replace(/%s/g, encodedParam).replace(/%S/g, param);
-
-    if (/%s/i.test(postData)) // POST keyword
-      aPostDataRef.value = getPostDataStream(postData, param, encodedParam,
-                                             "application/x-www-form-urlencoded");
-  }
-  else if (param) {
-    // This keyword doesn't take a parameter, but one was provided. Just return
-    // the original URL.
-    aPostDataRef.value = null;
-
-    return aURL;
-  }
-
-  // This URL came from a bookmark, so it's safe to let it inherit the current
-  // document's principal.
-  if (aMayInheritPrincipal)
-    aMayInheritPrincipal.value = true;
-
-  return shortcutURL;
-}
 
 })();
