@@ -4,10 +4,11 @@
 // @namespace      http://d.hatena.ne.jp/Griever/
 // @author         Griever
 // @license        MIT License
-// @compatibility  Firefox 17
+// @compatibility  Firefox 40
 // @charset        UTF-8
 // @include        main
-// @version        0.0.9
+// @version        0.0.10
+// @note           0.0.10 Firefox 40 で動かなくなった部分を修正
 // @note           0.0.9 細部を修正
 // @note           0.0.8 Firefox 25 でエラーが出ていたのを修正
 // @note           0.0.7 ツールバーが自動で消えないことがあったのを修正
@@ -1019,10 +1020,17 @@ function getWins(win) {
 }
 function checkDoc(doc) {
 	if (!(doc instanceof HTMLDocument)) return false;
-	if (!window.mimeTypeIsTextBased(doc.contentType)) return false;
+	if (!mimeTypeIsTextBased(doc.contentType)) return false;
 	if (!doc.body || !doc.body.hasChildNodes()) return false;
 	if (doc.body instanceof HTMLFrameSetElement) return false;
 	return true;
+}
+function mimeTypeIsTextBased(contentType) {
+	return /^text\/|\+xml$/.test(contentType) ||
+		contentType == "application/x-javascript" ||
+		contentType == "application/javascript" ||
+		contentType == "application/xml" ||
+		contentType == "mozilla.application/cached-xul";
 }
 function getFocusedWindow() {
 	var win = document.commandDispatcher.focusedWindow;
@@ -1059,7 +1067,7 @@ window.gWHT.init();
   list-style-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAANUlEQVQ4jWNgGBTg6dOi/6RgrAb8/19PFB7EBlAUBoMDFD0t+k8qxjCgngQ4SA2gKAwGDAAAM3SE/usVkKQAAAAASUVORK5CYII=");\
 }\
 .wordhighlight-toolbar-icon[state="disable"] {\
-  filter: url("chrome://mozapps/skin/extensions/extensions.svg#greyscale");\
+  filter: grayscale(100%);\
 }\
 .wordhighlight-toolbar-arrowscrollbox > .autorepeatbutton-up,\
 .wordhighlight-toolbar-arrowscrollbox > .autorepeatbutton-down {\
