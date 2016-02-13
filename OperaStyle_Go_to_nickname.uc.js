@@ -3,7 +3,8 @@
 // @namespace      http://d.hatena.ne.jp/Griever/
 // @include        main
 // @charset        UTF-8
-// @varsion        0.0.8
+// @varsion        0.0.9
+// @note           0.0.9 e10s に対応したかも
 // @note           0.0.8 getKeywordForURI が廃止になるらしいので対応
 // @note           0.0.7 Firefox 25 の getShortcutOrURI 廃止に仮対応
 // @note           0.0.5 Remove E4X
@@ -64,7 +65,6 @@ window.gotoNickname= {
 
 	open: function(str){
 		if (str){
-			// loadURI(getShortcutOrURI(str ,{}));
 			this.loadKeyword(str);
 			return;
 		}
@@ -94,9 +94,7 @@ window.gotoNickname= {
 		}
 		var matchKeywords = this.keywords.filter(function(e) e.indexOf(value) === 0);
 		if (matchKeywords.length === 1) {
-			// loadURI(getShortcutOrURI(matchKeywords[0],{}));
 			this.loadKeyword(matchKeywords[0]);
-			content.focus();
 			this.lastMatchedKeyword = matchKeywords[0];
 			this.panel.hidePopup();
 		} else if (this.SHOW_COMPLETE) {
@@ -106,9 +104,7 @@ window.gotoNickname= {
 	onKeypress: function(event) {
 		var {keyCode:k, charCode:w, ctrlKey:c, shiftKey:s, altKey:a} = event;
 		if (k === event.DOM_VK_RETURN && !c && !s && !a) {
-			// loadURI(getShortcutOrURI(this.input.value ,{}));
 			this.loadKeyword(this.input.value);
-			content.focus();
 			this.panel.hidePopup();
 		}
 	},
@@ -150,7 +146,8 @@ window.gotoNickname= {
 		if (elem) elem.parentNode.removeChild(elem);
 	},
 	loadKeyword: function(keyword) {
-		getShortcutOrURIAndPostData(keyword, function({url}) {
+		PlacesUtils.keywords.fetch(keyword).then((obj) => {
+			var url = obj.url.href;
 			if (gBrowser.mCurrentTab.pinned && !url.startsWith('javascript')) {
 				openNewTabWith(url)
 			} else {

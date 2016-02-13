@@ -3,8 +3,9 @@
 // @namespace      http://d.hatena.ne.jp/Griever/
 // @description    右クリック→検索の強化
 // @include        main
-// @compatibility  Firefox 4
-// @version        0.0.9
+// @compatibility  Firefox 44
+// @version        0.1.0
+// @note           0.1.0 e10s に対応したかも
 // @note           0.0.9 「々」「ゞ」が拾えなかったのを修正
 // @note           0.0.8 Firefox 19 で入力欄で使えなくなったのを修正
 // @note           0.0.8 NEW_TAB の初期値を browser.search.openintab にした
@@ -90,15 +91,12 @@ window.contextSearcher = {
 
     this.context.addEventListener('popupshowing', this, false);
     this.menu.addEventListener('DOMMouseScroll', this, false);
-    gBrowser.mPanelContainer.addEventListener(this.isMac ? 'mousedown' : 'click', this, false);
     window.addEventListener('unload', this, false);
   },
 
   uninit: function() {
     this.context.removeEventListener('popupshowing', this, false);
     this.menu.removeEventListener('DOMMouseScroll', this, false);
-    gBrowser.mPanelContainer.removeEventListener('click', this, false);
-    gBrowser.mPanelContainer.removeEventListener('mousedown', this, false);
     window.removeEventListener('unload', this, false);
   },
 
@@ -152,22 +150,6 @@ window.contextSearcher = {
       postData: submission.postData,
       relatedToCurrent: true
     });
-  },
-
-  click: function(event) {
-    if (event.button === 2) {
-      this._clickNode = event.rangeParent;
-      this._clickOffset = event.rangeOffset;
-      this._clientX = event.clientX;
-    } else {
-      this._clickNode = null;
-      this._clickOffset = 0;
-      this._clientX = 0;
-    }
-  },
-
-  mousedown: function(event) {
-    this.click(event);
   },
 
   setMenuitem: function() {
@@ -252,13 +234,14 @@ window.contextSearcher = {
   
   getTextInputSelection: function () {
     var elem = document.commandDispatcher.focusedElement;
+    if (!elem) return '';
     var str = elem.value.slice(elem.selectionStart, elem.selectionEnd);
     return str.replace(/^\s*|\s*$/g, '').replace(/\s+/g, ' ');
   },
 
   getCursorPositionText: function() {
-    var node = this._clickNode;
-    var offset = this._clickOffset;
+    var node = gContextMenuContentData.event.rangeParent;
+    var offset = gContextMenuContentData.event.rangeOffset;
     if (!node || node.nodeType !== Node.TEXT_NODE)
       return "";
 
@@ -269,7 +252,7 @@ window.contextSearcher = {
     range.setStart(node, offset);
     var rect = range.getBoundingClientRect();
     range.detach();
-    if (rect.left >= this._clientX)
+    if (rect.left >= gContextMenuContentData.event.clientX)
       offset--;
 
     if (!text[offset]) return "";
@@ -294,7 +277,7 @@ window.contextSearcher = {
   },
   
   log: function() {
-    Application.console.log("[contextSearcher] " + Array.slice(arguments));
+    console.log("[contextSearcher] " + Array.slice(arguments));
   }
 }
 
