@@ -3,7 +3,8 @@
 // @namespace      http://d.hatena.ne.jp/Griever/
 // @include        main
 // @charset        UTF-8
-// @varsion        0.0.9
+// @varsion        0.0.10
+// @note           0.0.10 Firefox Syncなどでブックマークが削除された時に動作しなかったのを修正
 // @note           0.0.9 e10s に対応したかも
 // @note           0.0.8 getKeywordForURI が廃止になるらしいので対応
 // @note           0.0.7 Firefox 25 の getShortcutOrURI 廃止に仮対応
@@ -49,7 +50,7 @@ window.gotoNickname= {
 				var childNode = parentNode.getChild(i);
 				if (PlacesUtils.nodeIsBookmark(childNode)){
 					// var uri = ios.newURI(childNode.uri, null, null);
-					if (childNode.uri.indexOf('%s') >= 0)
+					if (!childNode.uri || childNode.uri.indexOf('%s') >= 0)
 						continue;
 					var keyword = bmsvc.getKeywordForBookmark(childNode.itemId);
 					if (keyword) ret.push(keyword);

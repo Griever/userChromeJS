@@ -4,7 +4,8 @@
 // @description    右クリック→検索の強化
 // @include        main
 // @compatibility  Firefox 44
-// @version        0.1.0
+// @version        0.1.1
+// @note           0.1.1 e10s で選択文字列の検索ができなかったのを修正
 // @note           0.1.0 e10s に対応したかも
 // @note           0.0.9 「々」「ゞ」が拾えなかったのを修正
 // @note           0.0.8 Firefox 19 で入力欄で使えなくなったのを修正
@@ -169,8 +170,8 @@ window.contextSearcher = {
     if (e.target != this.context) return;
 
     this.searchText = 
-      gContextMenu.onTextInput? this.getTextInputSelection() :
-      gContextMenu.isTextSelected? this.getBrowserSelection() :
+      gContextMenu.onTextInput? this.getTextInputSelection(gContextMenu.ownerDoc) :
+      gContextMenu.isTextSelected? this.getBrowserSelection(gContextMenu.ownerDoc) :
       gContextMenu.onImage? gContextMenu.target.getAttribute('alt') :
       //gContextMenu.onLink? gContextMenu.linkText() :
       this.getCursorPositionText();
@@ -219,9 +220,8 @@ window.contextSearcher = {
     }
   },
   
-  getBrowserSelection: function () {
-    var win = document.commandDispatcher.focusedWindow;
-    var sel = win.getSelection();
+  getBrowserSelection: function (doc) {
+    var sel = doc.defaultView.getSelection();
     var str = '';
     if (sel.isCollapsed)
       return str;
@@ -232,9 +232,9 @@ window.contextSearcher = {
     return str.replace(/^\s*|\s*$/g, '').replace(/\s+/g, ' ');
   },
   
-  getTextInputSelection: function () {
-    var elem = document.commandDispatcher.focusedElement;
-    if (!elem) return '';
+  getTextInputSelection: function (doc) {
+    var elem = document.activeElement;
+    if (!elem || !elem.value) return '';
     var str = elem.value.slice(elem.selectionStart, elem.selectionEnd);
     return str.replace(/^\s*|\s*$/g, '').replace(/\s+/g, ' ');
   },
